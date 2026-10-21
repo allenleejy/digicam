@@ -1,0 +1,40 @@
+# Digicam gift camera firmware
+# Target: GOOUUU ESP32-S3-CAM Core N16R8 (16 MB flash, 8 MB octal PSRAM), OV3660
+
+CONFIG_IDF_TARGET="esp32s3"
+
+# Flash: 16 MB, single large app partition
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="16MB"
+CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
+
+# CPU at 240 MHz. lovebox camera-test dropped to 160 MHz for colour errors on its 18-bit ILI9488;
+# this screen is 16-bit through esp_lcd. If colours come out wrong, try 160 MHz first.
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+
+# PSRAM: 8 MB octal, same settings as lovebox camera-test (verified on this board)
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_TYPE_AUTO=y
+CONFIG_SPIRAM_CLK_IO=30
+CONFIG_SPIRAM_CS_IO=26
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_BOOT_HW_INIT=y
+
+# Quiet bootloader: the serial link carries binary frames after boot
+CONFIG_BOOTLOADER_LOG_LEVEL_WARN=y
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+
+# FATFS: long file names
+CONFIG_FATFS_LFN_HEAP=y
+CONFIG_FATFS_MAX_LFN=255
+CONFIG_FATFS_CODEPAGE_850=y
+
+# JPEG decoder for the screen: the IDF build (not the ROM copy) so it can decode at 1/2, 1/4, 1/8
+CONFIG_JD_USE_ROM=n
+
+# Phone mode: Wi-Fi and lwIP buffers in PSRAM where they can go (internal RAM is tight
+# with the screen's framebuffer), and room for Safari's long request headers
+CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
+CONFIG_HTTPD_MAX_REQ_HDR_LEN=2048
+CONFIG_HTTPD_MAX_URI_LEN=512

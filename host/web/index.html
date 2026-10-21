@@ -1,0 +1,750 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Digicam Simulator</title>
+<style>
+  :root {
+    --page: #efe9e1;
+    --ink: #2a2530;
+    --muted: #6f6878;
+    --card: #fbf8f4;
+    --line: #ddd5ca;
+    --body: #c9b8f2;
+    --body-shade: #b3a0e6;
+    --accent: #ff8a3d;
+    --accent-dark: #e06a1d;
+    --dial: #f6efe3;
+    --rec: #ff3b30;
+    --ok: #2f9e5b;
+    --warn: #c98a00;
+  }
+  [data-color="mint"] { --body: #a9e3cf; --body-shade: #8fd2bb; --accent: #ff6fa5; --accent-dark: #e04b85; }
+  [data-color="sun"]  { --body: #ffd76a; --body-shade: #f2c445; --accent: #4d7cff; --accent-dark: #2f5ee6; }
+  [data-color="ink"]  { --body: #3b3646; --body-shade: #2c2836; --accent: #ffcf3d; --accent-dark: #e5b31f; --dial: #d9d3e3; }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--page); color: var(--ink);
+    font: 14px/1.45 ui-sans-serif, -apple-system, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  }
+  .layout { display: flex; gap: 32px; padding: 32px; align-items: flex-start; justify-content: center; flex-wrap: wrap; }
+  h1 { font-size: 15px; margin: 0 0 4px; letter-spacing: .02em; }
+  .sub { color: var(--muted); font-size: 12.5px; margin: 0 0 18px; }
+
+  /* ---------- the camera, back view, drawn to scale at 8 px/mm (cad/instantsnap_body.scad) ---------- */
+  .stage { display: flex; flex-direction: column; align-items: center; }
+  .camera {
+    position: relative; width: 928px; height: 528px; margin-top: 40px;
+    background: var(--body); border-radius: 56px;
+    box-shadow: 0 2px 0 rgba(255,255,255,.55) inset, 0 -6px 0 rgba(0,0,0,.08) inset, 0 24px 50px rgba(60,40,90,.22);
+  }
+  /* clear back plate inside the 2.2 mm frame edge, with the internals showing through */
+  .plate { position: absolute; inset: 18px; border-radius: 38px; overflow: hidden;
+           background: linear-gradient(160deg, rgba(236,241,248,.92), rgba(214,222,234,.88)); }
+  .ghost { position: absolute; border-radius: 6px; }
+  .ghost.battery { left: 54px; top: 73px; width: 280px; height: 416px; background: rgba(150,154,166,.35);
+                   display: flex; align-items: flex-end; justify-content: center; padding-bottom: 16px;
+                   font-size: 11px; letter-spacing: .16em; color: rgba(40,40,60,.35); }
+  .ghost.board { left: 350px; top: 218px; width: 536px; height: 224px; background: rgba(40,110,80,.28); }
+  .ghost.charger { left: 746px; top: 90px; width: 144px; height: 112px; background: rgba(91,141,239,.25); }
+  .ghost.lens { left: 524px; top: 68px; width: 68px; height: 68px; background: rgba(30,30,40,.4); border-radius: 8px; }
+  .brand { position: absolute; left: 64px; bottom: 30px; font-weight: 800; letter-spacing: .32em; font-size: 12px;
+           color: rgba(0,0,0,.25); text-transform: lowercase; user-select: none; }
+  .owner { position: absolute; left: 64px; bottom: 14px; font-size: 10.5px; color: rgba(0,0,0,.3); letter-spacing: .12em; }
+  .screw { position: absolute; width: 26px; height: 26px; margin: -13px; border-radius: 50%;
+           background: radial-gradient(circle at 40% 35%, #d9d9e0, #8e8e99); box-shadow: 0 1px 2px rgba(0,0,0,.3); }
+  .screw::after { content: ""; position: absolute; left: 6px; top: 12px; width: 14px; height: 2px; background: rgba(0,0,0,.35); }
+  .keyhole { position: absolute; left: 48px; top: 48px; width: 34px; height: 34px; margin: -17px; border-radius: 50%;
+             background: var(--page); box-shadow: inset 0 2px 4px rgba(0,0,0,.35); }
+  .keyring { position: absolute; left: 14px; top: -34px; width: 70px; height: 70px; border-radius: 50%;
+             border: 4px solid #b9b9c4; box-shadow: 0 1px 2px rgba(0,0,0,.25); pointer-events: none; }
+
+  .viewfinder { position: absolute; left: 365px; top: 53px; width: 166px; height: 134px; border-radius: 22px;
+                background: var(--accent); padding: 19px; box-shadow: 0 -3px 0 rgba(0,0,0,.12) inset; }
+  .viewfinder .glass { width: 100%; height: 100%; border-radius: 12px;
+    background: linear-gradient(135deg, #2c2a37 0%, #4a4660 45%, #7c7896 52%, #2c2a37 60%);
+    box-shadow: inset 0 0 0 2px rgba(0,0,0,.35); }
+
+  /* back buttons: previous, OK/gallery, next */
+  .bbtn { position: absolute; top: 104px; width: 48px; height: 48px; margin-left: -24px; border-radius: 50%; border: 0;
+          background: var(--accent); color: rgba(0,0,0,.45); font: 700 15px/48px -apple-system, sans-serif; cursor: pointer;
+          box-shadow: 0 -3px 0 var(--accent-dark) inset, 0 3px 4px rgba(0,0,0,.18); padding: 0; }
+  .bbtn.down, .bbtn:active { transform: translateY(2px); box-shadow: 0 -1px 0 var(--accent-dark) inset; }
+  .led { position: absolute; right: -6px; top: 160px; width: 8px; height: 8px; border-radius: 50%; background: #6b6676; }
+  .led.on { background: #7dff9e; box-shadow: 0 0 8px #7dff9e; }
+
+  /* the 2.0 in screen module seen through the clear plate; the window shows its 320x240 glass */
+  .module { position: absolute; left: 394px; top: 224px; width: 464px; height: 280px; border-radius: 6px;
+            background: #1d2235; box-shadow: 0 2px 6px rgba(0,0,0,.25); }
+  .bezel { position: absolute; left: 462px; top: 244px; width: 328px; height: 248px; padding: 4px;
+           background: #0a0a0e; border-radius: 4px; }
+  .screen-wrap { width: 320px; height: 240px; overflow: hidden; background: #000; position: relative; }
+
+  /* top edge: shutter (right) and power switch in its finger recess (middle) */
+  .shutter { position: absolute; left: 768px; top: -16px; width: 64px; height: 24px; border-radius: 14px 14px 4px 4px;
+             background: var(--accent); border: 0; cursor: pointer;
+             box-shadow: 0 -4px 0 var(--accent-dark) inset, 0 3px 0 rgba(0,0,0,.1); transition: transform .06s; }
+  .shutter.down { transform: translateY(5px); box-shadow: 0 -1px 0 var(--accent-dark) inset; }
+  .switch { position: absolute; left: 608px; top: -7px; width: 96px; height: 14px; border-radius: 7px; border: 0; padding: 0;
+            background: var(--body-shade); cursor: pointer; box-shadow: inset 0 2px 3px rgba(0,0,0,.25); }
+  .switch::after { content: ""; position: absolute; top: 2px; left: 30px; width: 16px; height: 10px; border-radius: 3px;
+                   background: #6f6a7a; transition: left .15s; }
+  .switch.on::after { left: 50px; background: #fff; }
+  .top-label { position: absolute; top: -40px; font-size: 10px; letter-spacing: .14em; color: var(--muted); white-space: nowrap; }
+
+  /* ---------- the device screen: the real 2.0 in, 320x240, shown 1:1 ---------- */
+  .screen {
+    width: 320px; height: 240px; position: relative;
+    background: #000; color: #fff; overflow: hidden;
+    font: 11px/1.25 "SF Mono", ui-monospace, Menlo, monospace;
+  }
+  .layer { position: absolute; inset: 0; }
+  .hidden { display: none !important; }
+  #live { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .bar { position: absolute; left: 0; right: 0; height: 22px; display: flex; align-items: center; gap: 6px;
+         padding: 0 7px; font-size: 9.5px; letter-spacing: .04em; text-shadow: 0 1px 2px rgba(0,0,0,.8); }
+  .bar.top { top: 0; background: linear-gradient(rgba(0,0,0,.55), rgba(0,0,0,0)); }
+  .bar.bottom { bottom: 0; background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.6)); }
+  .chip { padding: 1px 5px; border-radius: 4px; background: rgba(255,255,255,.18); }
+  .chip.video { background: rgba(255,59,48,.85); }
+  .grow { flex: 1; }
+  .batt { display: inline-flex; align-items: center; gap: 3px; }
+  .rec { position: absolute; top: 28px; left: 8px; display: flex; align-items: center; gap: 5px; font-size: 11px;
+         text-shadow: 0 1px 2px #000; }
+  .rec i { width: 8px; height: 8px; border-radius: 50%; background: var(--rec); animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: .2; } }
+  .toast { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 6px 12px; border-radius: 8px;
+           background: rgba(0,0,0,.62); font-size: 14px; letter-spacing: .03em; white-space: nowrap; transition: opacity .25s; }
+  .saved { position: absolute; right: 8px; bottom: 28px; display: flex; align-items: center; gap: 6px; padding: 4px;
+           background: rgba(0,0,0,.6); border-radius: 6px; font-size: 9.5px; transition: opacity .3s, transform .3s; }
+  .saved img { width: 44px; height: 33px; object-fit: cover; border-radius: 3px; }
+  .flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+  .flash.go { animation: flash .45s ease-out; }
+  @keyframes flash { 0% { opacity: .95; } 100% { opacity: 0; } }
+  .busy { position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%); font-size: 10px;
+          background: rgba(0,0,0,.6); padding: 3px 8px; border-radius: 10px; }
+
+  .boot { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+          background: radial-gradient(circle at 50% 40%, var(--body) 0%, #2a2238 75%); }
+  .boot b { font: 800 22px/1 -apple-system, "Helvetica Neue", sans-serif; letter-spacing: .14em; }
+  .boot span { font-size: 10px; opacity: .8; letter-spacing: .1em; }
+
+  .gallery { background: #0d0c10; }
+  .gallery img, .gallery canvas { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .gallery .empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+                    color: #aaa; font-size: 11px; text-align: center; padding: 20px; }
+  .badge { position: absolute; top: 28px; right: 8px; font-size: 9px; padding: 1px 5px; border-radius: 4px; background: rgba(255,255,255,.2); }
+  .confirm { position: absolute; inset: 0; background: rgba(0,0,0,.72); display: flex; flex-direction: column;
+             align-items: center; justify-content: center; gap: 10px; text-align: center; font-size: 11px; }
+  .confirm b { font-size: 14px; }
+  .confirm .opt { display: flex; gap: 14px; color: #ddd; font-size: 10px; }
+  .confirm .opt span:first-child { color: #ff8a80; }
+
+  .dim { position: absolute; inset: 0; background: #000; pointer-events: none; opacity: 0; transition: opacity .6s; }
+  .dim.half { opacity: .55; }
+  .dim.full { opacity: 1; }
+  .nolink { display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; color: #bbb; }
+
+  /* ---------- side panel ---------- */
+  .panel { width: 360px; display: flex; flex-direction: column; gap: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+  .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 10px; }
+  .conn { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+  .conn i { width: 9px; height: 9px; border-radius: 50%; background: #bbb; }
+  .conn.ok i { background: var(--ok); }
+  .conn.bad i { background: var(--rec); }
+  .meta { color: var(--muted); font-size: 12px; margin-top: 4px; word-break: break-word; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; }
+  .stat .v { font: 600 16px/1.2 ui-sans-serif, -apple-system, sans-serif; font-variant-numeric: tabular-nums; }
+  .stat .k { color: var(--muted); font-size: 11.5px; }
+  table.keys { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.keys td { padding: 4px 0; vertical-align: top; }
+  table.keys td:first-child { width: 112px; color: var(--muted); }
+  kbd { font: 11px ui-monospace, Menlo, monospace; background: #fff; border: 1px solid var(--line); border-bottom-width: 2px;
+        border-radius: 5px; padding: 0 5px; }
+  .btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  button.b { font: 600 12px ui-sans-serif, -apple-system, sans-serif; padding: 6px 10px; border-radius: 8px;
+             border: 1px solid var(--line); background: #fff; color: var(--ink); cursor: pointer; }
+  button.b:hover { border-color: #bfb4a6; }
+  a.b { font: 600 12px ui-sans-serif, -apple-system, sans-serif; padding: 6px 10px; border-radius: 8px;
+        border: 1px solid var(--line); background: #fff; color: var(--ink); text-decoration: none; }
+  .swatches { display: flex; gap: 8px; }
+  .swatches button { width: 26px; height: 26px; border-radius: 50%; border: 2px solid #fff; cursor: pointer;
+                     box-shadow: 0 0 0 1px var(--line); }
+  .log { height: 170px; overflow: auto; font: 11px/1.45 ui-monospace, Menlo, monospace; color: #3f3a47;
+         background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; white-space: pre-wrap; }
+  .log .e { color: #b42318; }
+  .log .w { color: #9a6700; }
+  .log .h { color: #1d5bd8; }
+  .item-actions { display: none; }
+  .item-actions.show { display: flex; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <div class="stage">
+    <h1>Digicam simulator · InstantSnap-style</h1>
+    <p class="sub">The real camera board runs everything: sensor, photos, video and SD card. This page stands in for the 2.0 in screen and the buttons. The body is drawn to scale (116 × 66 mm).</p>
+
+    <div class="camera" id="camera" data-color="lilac">
+      <span class="top-label" style="left:774px">SHUTTER</span>
+      <button class="shutter" id="shutter" title="Shutter (Space)"></button>
+      <span class="top-label" style="left:636px">POWER</span>
+      <button class="switch on" id="power" title="Power switch (P)"></button>
+
+      <div class="plate">
+        <div class="ghost battery">2000 mAh</div>
+        <div class="ghost board"></div>
+        <div class="ghost charger"></div>
+        <div class="ghost lens"></div>
+      </div>
+      <div class="keyhole"><div class="keyring"></div></div>
+      <div class="screw" style="left:40px;top:488px"></div>
+      <div class="screw" style="left:888px;top:488px"></div>
+      <div class="screw" style="left:888px;top:40px"></div>
+      <div class="screw" style="left:136px;top:40px"></div>
+      <div class="viewfinder"><div class="glass"></div></div>
+      <button class="bbtn" id="b-left" style="left:672px" title="Previous (←)">◀</button>
+      <button class="bbtn" id="b-ok" style="left:768px" title="OK / gallery (Enter); hold for mode or delete">●</button>
+      <button class="bbtn" id="b-right" style="left:864px" title="Next (→)">▶</button>
+      <div class="led" id="led" title="Charge LED"></div>
+      <div class="brand">digicam</div>
+      <div class="owner" id="owner"></div>
+
+      <div class="module"></div>
+      <div class="bezel">
+        <div class="screen-wrap">
+          <div class="screen" id="screen">
+            <!-- live view -->
+            <div class="layer" id="v-preview">
+              <img id="live" alt="">
+              <div class="bar top">
+                <span class="chip" id="mode-chip">PHOTO</span>
+                <span id="look-name">Natural</span>
+                <span class="grow"></span>
+                <span id="left"></span>
+                <span class="batt" title="No battery fitted yet: running on USB">⚡USB</span>
+              </div>
+              <div class="rec hidden" id="rec"><i></i><span id="rec-time">00:00</span></div>
+              <div class="busy hidden" id="busy">Saving…</div>
+              <div class="saved hidden" id="saved"><img id="saved-img" alt=""><span id="saved-name"></span></div>
+              <div class="flash" id="flash"></div>
+            </div>
+
+            <!-- gallery -->
+            <div class="layer gallery hidden" id="v-gallery">
+              <img id="g-img" alt="">
+              <canvas id="g-vid" class="hidden" width="640" height="480"></canvas>
+              <div class="empty hidden" id="g-empty">No photos yet.<br>Press the shutter to take one.</div>
+              <div class="bar top"><span class="chip">GALLERY</span><span class="grow"></span><span id="g-pos"></span></div>
+              <span class="badge hidden" id="g-badge"></span>
+              <div class="bar bottom"><span id="g-name"></span><span class="grow"></span><span id="g-size"></span></div>
+              <div class="confirm hidden" id="g-confirm">
+                <b>Delete this?</b><span id="g-confirm-name"></span>
+                <div class="opt"><span>Press ●: delete</span><span>Shutter: cancel</span></div>
+              </div>
+            </div>
+
+            <div class="layer boot hidden" id="v-boot"><b>DIGICAM</b><span id="boot-hi"></span></div>
+            <div class="layer nolink hidden" id="v-nolink">Waiting for the camera board…</div>
+            <div class="toast hidden" id="toast"></div>
+            <div class="dim" id="dim"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <aside class="panel">
+    <div class="card">
+      <div class="conn" id="conn"><i></i><span id="conn-text">Connecting…</span></div>
+      <div class="meta" id="conn-meta"></div>
+    </div>
+
+    <div class="card">
+      <h2>Live numbers</h2>
+      <div class="stats">
+        <div class="stat"><div class="v" id="s-fps">–</div><div class="k">sensor frames/s</div></div>
+        <div class="stat"><div class="v" id="s-tx">–</div><div class="k">frames/s to laptop</div></div>
+        <div class="stat"><div class="v" id="s-sd">–</div><div class="k">SD free</div></div>
+        <div class="stat"><div class="v" id="s-count">–</div><div class="k">photos · videos</div></div>
+        <div class="stat"><div class="v" id="s-link">–</div><div class="k">USB link KB/s</div></div>
+        <div class="stat"><div class="v" id="s-crc">–</div><div class="k">link errors (recovered)</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Controls</h2>
+      <table class="keys">
+        <tr><td>Shutter</td><td><kbd>Space</kbd> or click. Photo, or start/stop video. In the gallery: back to live view.</td></tr>
+        <tr><td>◀ ▶</td><td><kbd>←</kbd> <kbd>→</kbd> or click. Live view: film look. Gallery: previous/next.</td></tr>
+        <tr><td>Press ●</td><td><kbd>Enter</kbd> or click. Live view: open gallery. Gallery: back.</td></tr>
+        <tr><td>Hold ●</td><td>Hold <kbd>Enter</kbd> or ● for 0.6 s. Live view: photo/video mode. Gallery: delete.</td></tr>
+        <tr><td>Power</td><td><kbd>P</kbd> or click the switch on the top edge.</td></tr>
+      </table>
+      <div class="btns">
+        <button class="b" data-act="left">◀</button>
+        <button class="b" data-act="right">▶</button>
+        <button class="b" data-act="press">Press ●</button>
+        <button class="b" data-act="hold">Hold ●</button>
+        <button class="b" data-act="shutter">Shutter</button>
+      </div>
+      <div class="btns item-actions" id="item-actions">
+        <a class="b" id="open-full" target="_blank">Open full size</a>
+        <a class="b" id="download">Save to laptop</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Colourway</h2>
+      <div class="swatches">
+        <button style="background:#c9b8f2" data-color="lilac" title="Lilac / orange"></button>
+        <button style="background:#a9e3cf" data-color="mint" title="Mint / pink"></button>
+        <button style="background:#ffd76a" data-color="sun" title="Sun / blue"></button>
+        <button style="background:#3b3646" data-color="ink" title="Ink / yellow"></button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Camera log</h2>
+      <div class="log" id="log"></div>
+    </div>
+  </aside>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const LONG_MS = 600, DIM_MS = 30000, SLEEP_MS = 120000;
+
+const st = {
+  connected: false, booted: false, power: true,
+  view: 'preview',            // preview | gallery
+  mode: 'photo', look: 0, looks: ['Natural'],
+  busy: false, rec: false,
+  items: [], gi: 0, confirm: false,
+  lastInput: Date.now(), dim: 0,
+  logSeq: 0, eventSeq: 0, status: {}, owner: '',
+};
+
+// ---------------------------------------------------------------- device calls
+async function cmd(name, args = {}) {
+  const r = await fetch('/api/cmd', { method: 'POST', body: JSON.stringify({ cmd: name, ...args }) });
+  return r.json();
+}
+
+// ---------------------------------------------------------------- screen helpers
+function show(id) {
+  for (const v of ['v-preview', 'v-gallery', 'v-boot', 'v-nolink']) $(v).classList.toggle('hidden', v !== id);
+}
+let toastTimer;
+function toast(text, ms = 1100) {
+  const t = $('toast');
+  t.textContent = text;
+  t.classList.remove('hidden');
+  t.style.opacity = 1;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.style.opacity = 0; setTimeout(() => t.classList.add('hidden'), 250); }, ms);
+}
+function fmtTime(ms) {
+  const s = Math.floor(ms / 1000);
+  return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+}
+function setLive(on) {
+  // Pause the stream while it isn't on screen: the USB link then has room for gallery downloads.
+  $('live').src = on ? '/stream.mjpg?' + Date.now() : '';
+  cmd('stream', { on });
+}
+function renderTopBar() {
+  const s = st.status;
+  $('mode-chip').textContent = st.mode === 'video' ? 'VIDEO' : 'PHOTO';
+  $('mode-chip').classList.toggle('video', st.mode === 'video');
+  $('look-name').textContent = st.looks[st.look] || '';
+  if (s.sd) {
+    $('left').textContent = st.mode === 'photo'
+      ? '~' + Math.floor(s.sd_free_mb * 1024 / 240) + ' left'
+      : '~' + Math.floor(s.sd_free_mb / 0.28 / 60) + ' min';
+  } else {
+    $('left').textContent = 'NO CARD';
+  }
+}
+
+// ---------------------------------------------------------------- power, boot, sleep
+async function boot() {
+  st.booted = true;
+  show('v-boot');
+  $('boot-hi').textContent = st.owner ? 'hi, ' + st.owner.toLowerCase() : 'ready when you are';
+  await new Promise(r => setTimeout(r, 1300));
+  if (!st.power) return;
+  st.view = 'preview';
+  show('v-preview');
+  setLive(true);
+  renderTopBar();
+}
+async function setPower(on) {
+  st.power = on;
+  $('power').classList.toggle('on', on);
+  if (!on) {
+    if (st.rec) await stopRec();
+    $('live').src = '';
+    show(null);
+    $('dim').className = 'dim full';
+    await cmd('power', { on: false });
+  } else {
+    $('dim').className = 'dim';
+    await cmd('power', { on: true });
+    boot();
+  }
+}
+// Back from a link drop without a board restart: put the same screen back.
+function restoreView() {
+  if (st.view === 'gallery') show('v-gallery');
+  else { show('v-preview'); setLive(true); }
+}
+// Returns true when the input only woke a sleeping screen.
+function wake() {
+  st.lastInput = Date.now();
+  if (st.dim === 2) {
+    st.dim = 0;
+    $('dim').className = 'dim';
+    if (st.view === 'preview') setLive(true);
+    return true;
+  }
+  // Only dimmed: brighten and let the press do its job too.
+  if (st.dim === 1) { st.dim = 0; $('dim').className = 'dim'; }
+  return false;
+}
+setInterval(() => {
+  if (!st.power || !st.booted || st.rec) return;
+  const idle = Date.now() - st.lastInput;
+  if (idle > SLEEP_MS && st.dim < 2) {
+    st.dim = 2; $('dim').className = 'dim full';
+    if (st.view === 'preview') setLive(false);
+  } else if (idle > DIM_MS && st.dim < 1) {
+    st.dim = 1; $('dim').className = 'dim half';
+  }
+}, 1000);
+
+// ---------------------------------------------------------------- photo and video
+async function takePhoto() {
+  st.busy = true;
+  $('flash').classList.remove('go'); void $('flash').offsetWidth; $('flash').classList.add('go');
+  $('busy').classList.remove('hidden');
+  const r = await cmd('photo');
+  $('busy').classList.add('hidden');
+  st.busy = false;
+  if (!r.ok) return toast(r.error || 'Photo failed');
+  $('saved-img').src = '/api/media/' + r.name + '?thumb=1';
+  $('saved-name').textContent = r.name;
+  const s = $('saved');
+  s.classList.remove('hidden'); s.style.opacity = 1;
+  setTimeout(() => { s.style.opacity = 0; setTimeout(() => s.classList.add('hidden'), 300); }, 1800);
+}
+async function startRec() {
+  st.busy = true;
+  const r = await cmd('rec_start');
+  st.busy = false;
+  if (!r.ok) return toast(r.error || 'Could not record');
+  st.rec = true;
+  $('rec').classList.remove('hidden');
+}
+async function stopRec() {
+  st.busy = true;
+  $('busy').textContent = 'Saving video…';
+  $('busy').classList.remove('hidden');
+  const r = await cmd('rec_stop');
+  $('busy').classList.add('hidden');
+  $('busy').textContent = 'Saving…';
+  st.busy = false;
+  st.rec = false;
+  $('rec').classList.add('hidden');
+  if (r.ok) toast('Saved ' + r.name + ' · ' + Math.round(r.ms / 1000) + ' s', 1600);
+  else toast(r.error || 'Video failed');
+}
+async function toggleMode() {
+  if (st.rec) return toast('Stop recording first');
+  const next = st.mode === 'photo' ? 'video' : 'photo';
+  st.busy = true;
+  const r = await cmd('mode', { mode: next });
+  st.busy = false;
+  if (!r.ok) return toast(r.error || 'Mode change failed');
+  st.mode = next;
+  renderTopBar();
+  toast(next === 'video' ? '● VIDEO' : '◉ PHOTO');
+}
+async function changeLook(d) {
+  const n = st.looks.length;
+  st.look = (st.look + d + n) % n;
+  renderTopBar();
+  toast(st.looks[st.look]);
+  await cmd('look', { index: st.look });
+}
+
+// ---------------------------------------------------------------- gallery
+let galleryToken = 0, player = null;
+async function openGallery() {
+  st.view = 'gallery';
+  st.confirm = false;
+  setLive(false);
+  show('v-gallery');
+  $('g-empty').classList.add('hidden');
+  $('g-img').src = '';
+  $('g-pos').textContent = 'loading…';
+  const r = await cmd('list');
+  st.items = r.ok ? r.items : [];
+  st.gi = 0;
+  renderItem();
+}
+function closeGallery() {
+  stopPlayer();
+  st.view = 'preview';
+  st.confirm = false;
+  $('g-confirm').classList.add('hidden');
+  $('item-actions').classList.remove('show');
+  show('v-preview');
+  setLive(true);
+  renderTopBar();
+}
+function stopPlayer() {
+  if (player) { clearInterval(player.timer); player.urls.forEach(u => URL.revokeObjectURL(u)); player = null; }
+  $('g-vid').classList.add('hidden');
+}
+async function renderItem() {
+  stopPlayer();
+  const token = ++galleryToken;
+  const empty = st.items.length === 0;
+  $('g-empty').classList.toggle('hidden', !empty);
+  $('item-actions').classList.toggle('show', !empty);
+  $('g-badge').classList.add('hidden');
+  if (empty) {
+    $('g-img').src = ''; $('g-pos').textContent = ''; $('g-name').textContent = ''; $('g-size').textContent = '';
+    return;
+  }
+  const it = st.items[st.gi];
+  $('g-pos').textContent = (st.gi + 1) + ' / ' + st.items.length;
+  $('g-name').textContent = it.n;
+  $('g-size').textContent = (it.s / 1024 / 1024).toFixed(it.s > 1e6 ? 1 : 2) + ' MB';
+  $('open-full').href = '/api/media/' + it.n;
+  $('download').href = '/api/media/' + it.n + '?download=1';
+  $('g-img').classList.remove('hidden');
+  $('g-img').src = '/api/media/' + it.n + '?thumb=1';
+  // Full-size photo, or the whole video, follows the thumbnail.
+  await new Promise(r => setTimeout(r, 250));
+  if (token !== galleryToken) return;
+  if (!it.v) {
+    $('g-badge').textContent = 'loading full size…'; $('g-badge').classList.remove('hidden');
+    const img = new Image();
+    img.onload = () => { if (token === galleryToken) { $('g-img').src = img.src; $('g-badge').textContent = '2048×1536'; } };
+    img.src = '/api/media/' + it.n;
+  } else {
+    // Videos come over the USB link at ~120 KB/s, so wait a moment in case ◀/▶ keeps being pressed.
+    $('g-badge').textContent = '▶ ' + (it.s / 1024 / 1024).toFixed(1) + ' MB video'; $('g-badge').classList.remove('hidden');
+    await new Promise(r => setTimeout(r, 900));
+    if (token !== galleryToken) return;
+    $('g-badge').textContent = 'loading video… ~' + Math.ceil(it.s / 120000) + ' s';
+    const res = await fetch('/api/media/' + it.n);
+    if (token !== galleryToken) return;
+    if (!res.ok) { $('g-badge').textContent = 'video not loaded'; return; }
+    const buf = await res.arrayBuffer();
+    if (token !== galleryToken) return;
+    playAvi(buf, token);
+  }
+}
+// Plays an MJPEG AVI: each '00dc' chunk is one JPEG frame.
+function playAvi(buf, token) {
+  const b = new Uint8Array(buf), dv = new DataView(buf);
+  const usPerFrame = dv.getUint32(32, true) || 66666;
+  const frames = [];
+  let p = 224;
+  while (p + 8 <= b.length) {
+    const id = String.fromCharCode(b[p], b[p + 1], b[p + 2], b[p + 3]);
+    const len = dv.getUint32(p + 4, true);
+    if (id !== '00dc') break;
+    frames.push(b.subarray(p + 8, p + 8 + len));
+    p += 8 + len + (len & 1);
+  }
+  if (!frames.length) { $('g-badge').textContent = 'empty video'; return; }
+  const urls = frames.map(f => URL.createObjectURL(new Blob([f], { type: 'image/jpeg' })));
+  const canvas = $('g-vid'), ctx = canvas.getContext('2d');
+  $('g-img').classList.add('hidden');
+  canvas.classList.remove('hidden');
+  const fps = 1e6 / usPerFrame;
+  $('g-badge').textContent = '▶ ' + (frames.length / fps).toFixed(1) + ' s · ' + fps.toFixed(0) + ' fps';
+  let i = 0;
+  const img = new Image();
+  img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  player = { urls, timer: setInterval(() => {
+    if (token !== galleryToken) return;
+    img.src = urls[i]; i = (i + 1) % urls.length;
+  }, usPerFrame / 1000) };
+}
+async function deleteItem() {
+  const it = st.items[st.gi];
+  st.confirm = false;
+  $('g-confirm').classList.add('hidden');
+  const r = await cmd('delete', { name: it.n });
+  if (!r.ok) return toast('Delete failed');
+  toast('Deleted');
+  st.items.splice(st.gi, 1);
+  st.gi = Math.min(st.gi, Math.max(0, st.items.length - 1));
+  renderItem();
+}
+
+// ---------------------------------------------------------------- the four inputs
+function ready() { return st.connected && st.power && st.booted && !st.busy; }
+
+function onShutter() {
+  if (!st.power) return;
+  if (wake() || !ready()) return;
+  if (st.view === 'gallery') {
+    if (st.confirm) { st.confirm = false; $('g-confirm').classList.add('hidden'); return; }
+    return closeGallery();
+  }
+  if (st.mode === 'photo') takePhoto();
+  else st.rec ? stopRec() : startRec();
+}
+function onTurn(d) {
+  if (!st.power) return;
+  if (wake() || !ready()) return;
+  if (st.view === 'gallery') {
+    if (st.confirm || !st.items.length) return;
+    st.gi = (st.gi + d + st.items.length) % st.items.length;
+    return renderItem();
+  }
+  changeLook(d);
+}
+function onPress() {
+  if (!st.power) return;
+  if (wake() || !ready()) return;
+  if (st.view === 'gallery') return st.confirm ? deleteItem() : closeGallery();
+  if (st.rec) return toast('Recording…');
+  openGallery();
+}
+function onHold() {
+  if (!st.power) return;
+  if (wake() || !ready()) return;
+  if (st.view === 'gallery') {
+    if (!st.items.length) return;
+    st.confirm = true;
+    $('g-confirm-name').textContent = st.items[st.gi].n;
+    $('g-confirm').classList.remove('hidden');
+    return;
+  }
+  toggleMode();
+}
+
+// press vs hold, for both the mouse on ● and the Enter key
+function holdable(down, el) {
+  let timer = null, held = false;
+  return {
+    start() { if (timer) return; held = false; el && el.classList.add('down');
+              timer = setTimeout(() => { held = true; onHold(); }, LONG_MS); },
+    end()   { if (!timer) return; clearTimeout(timer); timer = null; el && el.classList.remove('down');
+              if (!held) onPress(); },
+  };
+}
+// ● presses on release and long-presses after 0.6 s, from the mouse or the Enter key
+const okMouse = holdable(true, $('b-ok'));
+const okKey = holdable(true, $('b-ok'));
+$('b-ok').addEventListener('mousedown', e => { e.preventDefault(); okMouse.start(); });
+window.addEventListener('mouseup', () => okMouse.end());
+$('b-left').addEventListener('click', () => onTurn(-1));
+$('b-right').addEventListener('click', () => onTurn(1));
+function flash(id) { $(id).classList.add('down'); setTimeout(() => $(id).classList.remove('down'), 120); }
+$('shutter').addEventListener('mousedown', () => $('shutter').classList.add('down'));
+$('shutter').addEventListener('mouseup', () => { $('shutter').classList.remove('down'); onShutter(); });
+$('shutter').addEventListener('mouseleave', () => $('shutter').classList.remove('down'));
+$('power').addEventListener('click', () => setPower(!st.power));
+
+window.addEventListener('keydown', e => {
+  if (e.repeat && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  if (e.key === ' ') { e.preventDefault(); $('shutter').classList.add('down'); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); flash('b-left'); onTurn(-1); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); flash('b-right'); onTurn(1); }
+  else if (e.key === 'Enter') { e.preventDefault(); okKey.start(); }
+  else if (e.key === 'p' || e.key === 'P') setPower(!st.power);
+});
+window.addEventListener('keyup', e => {
+  if (e.key === ' ') { $('shutter').classList.remove('down'); onShutter(); }
+  else if (e.key === 'Enter') okKey.end();
+});
+document.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => {
+  ({ left: () => onTurn(-1), right: () => onTurn(1), press: onPress, hold: onHold, shutter: onShutter })[b.dataset.act]();
+}));
+document.querySelectorAll('[data-color]').forEach(b => b.addEventListener('click', () => {
+  if (b.id === 'camera') return;
+  $('camera').dataset.color = b.dataset.color;
+  try { localStorage.setItem('digicam-color', b.dataset.color); } catch (e) {}
+}));
+try { const c = localStorage.getItem('digicam-color'); if (c) $('camera').dataset.color = c; } catch (e) {}
+
+// ---------------------------------------------------------------- polling the board
+function logClass(line) {
+  if (line.startsWith('E ') || line.includes('error')) return 'e';
+  if (line.startsWith('W ')) return 'w';
+  if (line.startsWith('[')) return 'h';
+  return '';
+}
+async function poll() {
+  try {
+    const s = await (await fetch(`/api/state?log=${st.logSeq}&event=${st.eventSeq}`)).json();
+    st.owner = s.owner || '';
+    $('owner').textContent = st.owner ? 'for ' + st.owner : '';
+    const was = st.connected;
+    st.connected = s.connected;
+    $('conn').className = 'conn ' + (s.connected ? 'ok' : 'bad');
+    $('conn-text').textContent = s.connected ? 'Camera connected' : 'Camera not connected';
+    if (s.hello) {
+      $('conn-meta').textContent = `${s.port} · firmware ${s.hello.fw} · sensor OV3660 (${s.hello.sensor}) · SD ${s.hello.sd ? 'mounted' : 'missing'}`;
+      st.looks = s.hello.looks;
+    } else {
+      $('conn-meta').textContent = s.error ? `${s.port}: ${s.error}` : s.port;
+    }
+    if (s.status) {
+      const d = s.status;
+      st.status = d;
+      $('s-fps').textContent = d.fps?.toFixed(1) ?? '–';
+      $('s-tx').textContent = d.stream ? d.tx_fps?.toFixed(1) : 'paused';
+      $('s-sd').textContent = d.sd ? `${d.sd_free_mb} / ${d.sd_total_mb} MB` : 'no card';
+      $('s-count').textContent = `${d.photos} · ${d.videos}`;
+      $('s-link').textContent = s.link.kbps.toFixed(0);
+      $('s-crc').textContent = s.link.crc_errors;
+      if (!st.busy) {
+        st.mode = d.mode; st.look = d.look;
+        if (st.rec && !d.rec) { st.rec = false; $('rec').classList.add('hidden'); }
+      }
+      if (st.rec) $('rec-time').textContent = fmtTime(d.rec_ms);
+      if (st.view === 'preview') renderTopBar();
+    }
+    const log = $('log');
+    for (const [seq, ts, line] of s.logs || []) {
+      st.logSeq = seq;
+      const div = document.createElement('div');
+      div.className = logClass(line);
+      div.textContent = ts + '  ' + line;
+      log.appendChild(div);
+    }
+    while (log.childNodes.length > 300) log.removeChild(log.firstChild);
+    if (s.logs && s.logs.length) log.scrollTop = log.scrollHeight;
+    for (const [seq, ev] of s.events || []) {
+      st.eventSeq = seq;
+      if (ev.event === 'rec_stopped') toast('Video saved: ' + ev.name + ' (' + ev.why + ')', 2000);
+      if (ev.event === 'boot' && was) { st.booted = false; }   // the board really restarted
+    }
+    if (st.connected && !st.booted && st.power) boot();
+    else if (st.connected && !was && st.booted && st.power) restoreView();
+    if (!st.connected) show('v-nolink');
+  } catch (e) {
+    st.connected = false;
+    $('conn').className = 'conn bad';
+    $('conn-text').textContent = 'Simulator server stopped';
+    show('v-nolink');
+  }
+  setTimeout(poll, 400);
+}
+show('v-nolink');
+poll();
+</script>
+</body>
+</html>

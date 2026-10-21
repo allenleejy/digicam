@@ -1,0 +1,536 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Camera 1 Assembly</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one-screen workbench. The 3D model fills the stage; a step rail on the right
+   (below on phones) carries the instructions, like a printed build manual beside the part. */
+:root {
+  --bg: #f1eef5;            /* lilac-tinted bench paper */
+  --panel: #fbfaf8;
+  --ink: #1e1a26;
+  --muted: #6c6578;
+  --line: #ddd7e5;
+  --accent: #e8661c;        /* the camera's orange trim */
+  --accent-ink: #ffffff;
+  --lilac: #b8a3ea;         /* the frame colour */
+  --chip: #ece7f4;
+  --label-bg: rgba(30, 26, 38, .86);
+  --label-ink: #ffffff;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17151c; --panel: #1f1c25; --ink: #eeeaf4; --muted: #a59db3; --line: #332e3d;
+    --accent: #ff8a3d; --accent-ink: #1a1208; --lilac: #c9b8f2; --chip: #2a2532;
+    --label-bg: rgba(250, 248, 252, .9); --label-ink: #1e1a26; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #17151c; --panel: #1f1c25; --ink: #eeeaf4; --muted: #a59db3; --line: #332e3d;
+  --accent: #ff8a3d; --accent-ink: #1a1208; --lilac: #c9b8f2; --chip: #2a2532;
+  --label-bg: rgba(250, 248, 252, .9); --label-ink: #1e1a26; color-scheme: dark;
+}
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.5; }
+.app { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 400px; }
+.stage { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
+#gl { position: absolute; inset: 0; display: block; width: 100%; height: 100%; touch-action: none; }
+#labels { position: absolute; inset: 0; pointer-events: none; }
+.tag { position: relative; font: 600 11.5px/1.25 var(--body); letter-spacing: .01em; color: var(--label-ink); background: var(--label-bg);
+  padding: 4px 8px; border-radius: 3px; white-space: nowrap; transform: translateY(calc(-50% - 22px)); }
+.tag::after { content: ""; position: absolute; left: 50%; top: 100%; width: 1.5px; height: 18px; margin-left: -1px;
+  background: var(--label-bg); }
+.hud { position: absolute; left: 16px; right: 16px; bottom: 14px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; pointer-events: none; }
+.hud > * { pointer-events: auto; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--panel); }
+.seg button { font: 600 12px var(--body); color: var(--muted); background: none; border: 0; padding: 7px 11px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { color: var(--ink); background: var(--chip); }
+.explode { display: inline-flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 6px; padding: 5px 11px; font: 600 12px var(--body); color: var(--muted); }
+.explode input { width: 110px; accent-color: var(--accent); }
+.hint { font-size: 12px; color: var(--muted); margin-left: auto; }
+.loading { position: absolute; inset: 0; display: grid; place-items: center; font: 600 13px var(--mono); color: var(--muted); }
+
+.panel { background: var(--panel); border-left: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+.head { padding: 18px 22px 14px; border-bottom: 1px solid var(--line); display: grid; gap: 4px; }
+.eyebrow { font: 600 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.head h1 { margin: 0; font: 800 26px/1.1 var(--display); font-stretch: 112%; letter-spacing: -.01em; text-wrap: balance; }
+.body { padding: 16px 22px; overflow-y: auto; flex: 1; min-height: 0; display: grid; align-content: start; gap: 14px; }
+.body ol { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+.body li::marker { font: 600 12px var(--mono); color: var(--accent); }
+.body p { margin: 0; }
+.note { font-size: 13.5px; color: var(--muted); border-left: 2px solid var(--lilac); padding-left: 10px; }
+.kit { display: flex; flex-wrap: wrap; gap: 6px; }
+.kit span { font: 500 12px var(--mono); background: var(--chip); border-radius: 4px; padding: 3px 8px; display: inline-flex; align-items: center; gap: 6px; }
+.kit i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; box-shadow: 0 0 0 1px var(--muted); }
+.nav { padding: 12px 22px 16px; border-top: 1px solid var(--line); display: grid; gap: 12px; }
+.navrow { display: flex; gap: 8px; }
+.btn { font: 700 14px var(--body); border-radius: 6px; padding: 10px 14px; cursor: pointer; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); flex: 1; }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn:focus-visible, .seg button:focus-visible, .dots button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.dots { display: flex; flex-wrap: wrap; gap: 5px; }
+.dots button { font: 600 11px var(--mono); width: 28px; height: 26px; border-radius: 4px; border: 1px solid var(--line); background: none; color: var(--muted); cursor: pointer; font-variant-numeric: tabular-nums; }
+.dots button[aria-current="step"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+
+/* still images for the docs: canvas only, with the step name on it */
+body.shot .panel, body.shot .hud { display: none; }
+body.shot .app { grid-template-columns: 1fr; }
+.shotcap { display: none; }
+body.shot .shotcap { display: block; position: absolute; left: 28px; top: 22px; max-width: 70%; }
+.shotcap b { display: block; font: 600 13px var(--mono); color: var(--accent); }
+.shotcap span { font: 800 30px/1.1 var(--display); font-stretch: 112%; }
+
+@media (max-width: 860px) {
+  .app { grid-template-columns: 1fr; grid-template-rows: 54% 46%; }
+  .panel { border-left: 0; border-top: 1px solid var(--line); }
+  .head { padding: 12px 16px 10px; } .head h1 { font-size: 21px; }
+  .body { padding: 12px 16px; } .nav { padding: 10px 16px 12px; }
+  .hint { display: none; } .explode input { width: 80px; }
+  .hud { left: 10px; right: 10px; bottom: 10px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<div class="app">
+  <section class="stage" aria-label="3D model of the camera">
+    <canvas id="gl"></canvas>
+    <div id="labels"></div>
+    <div class="loading" id="loading">Loading parts…</div>
+    <div class="shotcap"><b id="shotnum"></b><span id="shottitle"></span></div>
+    <div class="hud">
+      <div class="seg" role="group" aria-label="View">
+        <button id="v-back" aria-pressed="false">Back</button>
+        <button id="v-front" aria-pressed="false">Front</button>
+        <button id="v-top" aria-pressed="false">Top</button>
+      </div>
+      <div class="seg" role="group" aria-label="Case">
+        <button id="t-case" aria-pressed="true">Case shown</button>
+      </div>
+      <label class="explode" for="ex">Pull apart <input id="ex" type="range" min="0" max="1" step="0.01" value="0"></label>
+      <span class="hint">Drag to turn · scroll to zoom</span>
+    </div>
+  </section>
+
+  <aside class="panel">
+    <div class="head">
+      <span class="eyebrow" id="count">Step 1 of 14</span>
+      <h1 id="title">All the parts</h1>
+    </div>
+    <div class="body" id="text"></div>
+    <div class="nav">
+      <div class="navrow">
+        <button class="btn" id="prev" aria-label="Previous step">Back</button>
+        <button class="btn" id="replay">Replay</button>
+        <button class="btn primary" id="next">Next step</button>
+      </div>
+      <div class="dots" id="dots" aria-label="Steps"></div>
+    </div>
+  </aside>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { STLLoader } from "three/addons/loaders/STLLoader.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
+
+// ------------------------------------------------------------------ the model
+// Body 110 x 64 x 15.1 mm. Model X runs left to right seen from the back, Y up, Z back to front.
+const BODY = { W: 110, H: 64, D: 15.1 };
+const WIRE = { black: "#26232b", red: "#d6393b", yellow: "#e2b300", green: "#2e9e5b", white: "#ecebe6",
+               blue: "#2f6fd6", purple: "#8a4fd0", orange: "#f08a2c" };
+const P = {
+  frame:        { c: "#c9b8f2", r: .55, ex: [0, 0, 0] },
+  sled:         { c: "#efe9dc", r: .7, ex: [0, 0, -6] },
+  back_plate:   { c: "#cfe0ff", o: .26, r: .1, ex: [0, 0, -46] },
+  front_plate:  { c: "#cfe0ff", o: .26, r: .1, ex: [0, 0, 46] },
+  lens_ring:    { c: "#ff8a3d", r: .45, ex: [0, 0, 56] },
+  vf_front:     { c: "#ff8a3d", r: .45, ex: [0, 0, 56] },
+  vf_back:      { c: "#ff8a3d", r: .45, ex: [0, 0, -56] },
+  caps:         { c: "#ff8a3d", r: .45, ex: [0, 0, -36] },
+  shutter_cap:  { c: "#ff8a3d", r: .45, ex: [0, 26, 0] },
+  battery:      { c: "#cdc6b4", r: .35, m: .5, ex: [-34, 0, 18] },
+  foam:         { c: "#e9e3ec", r: .9, ex: [-34, 0, 18] },
+  board_pcb:    { c: "#1f5a44", r: .6, ex: [0, 0, 20] },
+  board_pads:   { c: "#d9ad4f", r: .3, m: .8, ex: [0, 0, 20] },
+  board_parts:  { c: "#b9bdc6", r: .35, m: .7, ex: [0, 0, 20] },
+  screws_board: { c: "#80848c", r: .35, m: .8, ex: [0, 0, 30] },
+  screen_pcb:   { c: "#2a4a9b", r: .6, ex: [0, 0, -22] },
+  screen_glass: { c: "#121219", r: .2, ex: [0, 0, -22] },
+  screen_active:{ c: "#6a5fb0", r: .25, e: "#3a2f7a", ex: [0, 0, -22] },
+  screws_screen:{ c: "#80848c", r: .35, m: .8, ex: [0, 0, -30] },
+  charger_pcb:  { c: "#2f62c9", r: .6, ex: [0, 0, -18] },
+  charger_parts:{ c: "#b9bdc6", r: .35, m: .7, ex: [0, 0, -18] },
+  tape:         { c: "#f4f4f4", r: .9, ex: [0, 0, -12] },
+  camera:       { c: "#24232a", r: .5, ex: [0, 0, 30] },
+  camera_glass: { c: "#6d8fb3", r: .15, m: .3, ex: [0, 0, 30] },
+  buttons:      { c: "#2b2a30", r: .5, ex: [0, 0, -24] },
+  button_feet:  { c: "#b9bdc6", r: .35, m: .7, ex: [0, 0, -24] },
+  shutter_sw:   { c: "#2b2a30", r: .5, ex: [0, 16, 0] },
+  slide_sw:     { c: "#2b2a30", r: .5, ex: [0, 16, 0] },
+  inserts_back: { c: "#c9a24a", r: .3, m: .9, ex: [0, 0, -40] },
+  inserts_front:{ c: "#c9a24a", r: .3, m: .9, ex: [0, 0, 40] },
+  inserts_sled: { c: "#c9a24a", r: .3, m: .9, ex: [0, 0, -2] },
+  screws_back:  { c: "#80848c", r: .35, m: .8, ex: [0, 0, -52] },
+  screws_front: { c: "#80848c", r: .35, m: .8, ex: [0, 0, 52] },
+  screws_sled:  { c: "#80848c", r: .35, m: .8, ex: [0, 0, 26] },
+  w_bat_red:    { c: WIRE.red, r: .5, wire: 1 }, w_bat_black: { c: WIRE.black, r: .5, wire: 1 },
+  w_buttons:    { c: WIRE.white, r: .5, wire: 1 }, w_button_gnd: { c: WIRE.black, r: .5, wire: 1 },
+  w_power:      { c: WIRE.red, r: .5, wire: 1 }, w_gnd: { c: WIRE.black, r: .5, wire: 1 },
+  w_sense:      { c: WIRE.green, r: .5, wire: 1 }, resistors: { c: "#d8c39a", r: .6, wire: 1 },
+  ribbon:       { c: "#c47a22", r: .4, wire: 1 },
+};
+const SCREEN_COLOURS = [WIRE.black, WIRE.red, WIRE.yellow, WIRE.green, WIRE.white, WIRE.blue, WIRE.purple, WIRE.orange];
+SCREEN_COLOURS.forEach((c, i) => P["w_screen_" + i] = { c, r: .5, wire: 1 });
+
+const SCREEN_WIRES = SCREEN_COLOURS.map((_, i) => "w_screen_" + i);
+const SCREEN = ["screen_pcb", "screen_glass", "screen_active"];
+const BOARD = ["board_pcb", "board_pads", "board_parts"];
+const CHARGER = ["charger_pcb", "charger_parts", "tape"];
+const SLED = ["sled", ...SCREEN, "screws_screen", ...BOARD, "screws_board", ...CHARGER, ...SCREEN_WIRES];
+const CONTROLS = ["buttons", "button_feet", "shutter_sw", "slide_sw"];
+const FRAME = ["frame", "inserts_back", "inserts_front", "inserts_sled"];
+const CASE = ["frame", "back_plate", "front_plate"];
+const ALL = Object.keys(P);
+
+// ------------------------------------------------------------------ the steps
+const kit = (...items) => `<div class="kit">${items.map(([c, t]) => `<span><i style="background:${c}"></i>${t}</span>`).join("")}</div>`;
+const STEPS = [
+  { title: "All the parts", view: "side", explode: 1, show: ALL.filter(k => !P[k].wire),
+    text: `<p>Camera 1 is a clear sandwich: a printed frame between two clear plates, with every part held in place.</p>
+      <p>Pull the slider to take it apart or put it together. The steps that follow build it in order, on the desk first, then into the case.</p>
+      ${kit(["#c9b8f2", "frame"], ["#efe9dc", "sled"], ["#cfe0ff", "2 plates"], ["#ff8a3d", "caps and trims"], ["#c9a24a", "11 × M2 insert"], ["#80848c", "14 × M2×4, 5 × M2×3"])}
+      <p class="note">Wire positions on the board's edges are only a guide. Solder to the pins printed on your board, as in the wiring chart.</p>` },
+  { title: "Press in the inserts", view: "front3q", show: FRAME,
+    enter: { inserts_front: [0, 0, 14], inserts_back: [0, 0, -14], inserts_sled: [0, 0, 14] },
+    labels: { inserts_front: "4 front, 4 back", inserts_sled: "3 for the sled" },
+    text: `<ol><li>Heat each brass insert with the soldering iron (about 220 °C for PLA, 240 °C for PETG) and press it straight down until it sits flush.</li>
+      <li>Four corner posts take one insert from each face: 8 in all.</li>
+      <li>The three small blocks the sled sits on take one each, from the front.</li></ol>
+      ${kit(["#c9a24a", "11 × M2 heat-set insert"])}` },
+  { title: "Screw the screen to the sled", view: "back3q", show: ["sled", ...SCREEN, "screws_screen"],
+    enter: Object.fromEntries([...SCREEN.map(k => [k, [0, 0, -16]]), ["screws_screen", [0, 0, -26]]]),
+    labels: { screen_glass: ["Glass faces the back", [74.8, 30, 2.2]], screws_screen: ["4 × M2×3", [87.5, 11.1, 3]] },
+    text: `<ol><li>Desolder the screen's pin header first, so its back is flat.</li>
+      <li>Lay the screen on the sled's flat face, glass up, with its wire pads over one of the two slots.</li>
+      <li>Screw it down from the glass side with 4 × M2×3. The heads sit beside the glass, below its surface.</li></ol>
+      ${kit(["#2a4a9b", "1.14 in screen"], ["#80848c", "4 × M2×3"])}` },
+  { title: "Screw the board to the other side", view: "front3q", show: ["sled", ...SCREEN, "screws_screen", ...BOARD, "screws_board"],
+    enter: Object.fromEntries([...BOARD.map(k => [k, [0, 0, 16]]), ["screws_board", [0, 0, 26]]]),
+    labels: { board_parts: ["Components face the front", [62, 27, 12.9]], screws_board: ["M2×3 here, M2×4 elsewhere", [104.6, 34.2, 11]] },
+    text: `<ol><li>Turn the sled over. The board sits on the four raised pads, components up.</li>
+      <li>Screw it down through its corner holes: M2×4 in three corners, M2×3 in the top-right corner (the charge module sits behind it).</li>
+      <li>The camera socket and USB-C end go toward the right-hand side.</li></ol>
+      ${kit(["#1f5a44", "ESP32-S3 board"], ["#80848c", "3 × M2×4, 1 × M2×3"])}` },
+  { title: "Tape on the charge module", view: "back3q", show: ["sled", ...SCREEN, "screws_screen", ...BOARD, "screws_board", ...CHARGER],
+    enter: Object.fromEntries(CHARGER.map(k => [k, [0, 0, -16]])),
+    labels: { charger_parts: "USB-C flush with the edge" },
+    text: `<ol><li>Back face up again. Stick the charge module beside the screen with thin double-sided tape, not foam.</li>
+      <li>Line its USB-C socket up with the sled's right-hand edge: flush, not sticking out. The sled drops straight into the frame, and a socket that sticks out catches on the wall.</li></ol>
+      ${kit(["#2f62c9", "charge module"], ["#f4f4f4", "thin tape"])}` },
+  { title: "Wire the screen, then test", view: "front3q", show: SLED, ghost: [...BOARD, "screws_board"],
+    enter: Object.fromEntries(SCREEN_WIRES.map((k, i) => [k, [0, -4 - i, 0]])),
+    labels: { w_screen_3: ["8 wires through the slot, under the board", [57, 20, 7.7]] },
+    text: `<ol><li>Solder the 8 screen wires to its pads, then feed them through the slot under the screen to the board's underside.</li>
+      <li>Keep them short and flat. There's 1 mm under the board for them.</li>
+      <li>Board pins: GND, 3V3, 21 (SCL), 47 (SDA), EN (RES), 41 (DC), 42 (CS), 46 (BLK).</li></ol>
+      <p class="note">Stop here and bench test: plug the board's USB-C into the laptop and check the live view shows. It's far easier to fix a wire now than inside the case.</p>
+      ${kit(...SCREEN_COLOURS.map((c, i) => [c, ["GND", "3V3", "SCL", "SDA", "RES", "DC", "CS", "BLK"][i]]))}` },
+  { title: "Fit the controls", view: "back3q", show: [...FRAME, ...CONTROLS],
+    enter: { buttons: [0, 0, -18], button_feet: [0, 0, -18], shutter_sw: [0, 0, 18], slide_sw: [0, -2, 18] },
+    labels: { buttons: ["Buttons: plungers toward the back", [93, 51.5, 3]], slide_sw: ["Switch: drop in, slide up", [82.5, 63, 7.5]] },
+    text: `<ol><li>Solder a wire to two diagonal feet of each button first.</li>
+      <li>Glue the three buttons into the pockets on the back of the shelf, plungers facing the back plate.</li>
+      <li>Glue the shutter switch on its ledge under the top edge, plunger up.</li>
+      <li>Drop the slide switch into its pocket from the front, slide it up until the knob pokes through the top, and fix it with a dab of hot glue underneath.</li></ol>
+      ${kit(["#2b2a30", "3 buttons + shutter"], ["#2b2a30", "slide switch"])}` },
+  { title: "Seat the camera", view: "front3q", show: [...FRAME, ...CONTROLS, "camera", "camera_glass", "ribbon"],
+    enter: { camera: [0, 0, 20], camera_glass: [0, 0, 20], ribbon: [0, 0, 20] },
+    labels: { camera: "Lens forward", ribbon: "Ribbon out the bottom" },
+    text: `<ol><li>Connect the camera to its extension ribbon.</li>
+      <li>Drop the camera into its cradle from the front, lens facing out, and feed the ribbon through the slot at the bottom of the cradle.</li>
+      <li>The front plate holds it in place later. No glue.</li></ol>` },
+  { title: "Drop in the sled", view: "front3q", show: [...FRAME, ...CONTROLS, "camera", "camera_glass", "ribbon", ...SLED, "screws_sled"],
+    enter: Object.fromEntries([...SLED.map(k => [k, [0, 0, 26]]), ["screws_sled", [0, 0, 36]]]),
+    labels: { screws_sled: "3 × M2×4", board_parts: "Then plug in the ribbon" },
+    text: `<ol><li>Lower the sled in from the front, screen side first, until its three tabs rest on the blocks.</li>
+      <li>Screw the tabs down with 3 × M2×4.</li>
+      <li>Plug the camera ribbon into the board's camera socket and close the latch.</li></ol>
+      ${kit(["#80848c", "3 × M2×4"])}` },
+  { title: "Battery and its leads", view: "backtop", show: [...FRAME, ...CONTROLS, "camera", "camera_glass", "ribbon", ...SLED, "screws_sled", "battery", "foam", "w_bat_red", "w_bat_black"],
+    enter: { battery: [0, 0, 22], foam: [0, 0, 22], w_bat_red: [0, 6, 0], w_bat_black: [0, 6, 0] },
+    labels: { battery: "Leads out of the top", w_bat_red: ["Top lane, under the bridges", [54, 59.5, 8]], w_bat_black: ["Down beside the lens, across to B+ B−", [78, 40.5, 4]] },
+    text: `<ol><li>Stick 1 mm foam tape on both faces of the battery and press it into its bay, leads at the top.</li>
+      <li>Run the two leads up and along the lane above the viewfinder, under the two printed bridges.</li>
+      <li>Down through the gap between the viewfinder and the camera, then across to the charge module's B+ and B−.</li></ol>
+      <p class="note">Unplug the battery while you solder anything on the charge module. Check the polarity with a meter before plugging it in.</p>
+      ${kit([WIRE.red, "B+"], [WIRE.black, "B−"], ["#e9e3ec", "1 mm foam"])}` },
+  { title: "Wire the controls and power", view: "backtop", show: [...FRAME, ...CONTROLS, "camera", "camera_glass", "ribbon", ...SLED, "screws_sled", "battery", "foam", "w_bat_red", "w_bat_black", "w_buttons", "w_button_gnd", "w_power", "w_gnd", "w_sense", "resistors"],
+    enter: { w_buttons: [0, 5, 0], w_button_gnd: [0, 5, 0], w_power: [0, 5, 0], w_gnd: [0, -5, 0], w_sense: [0, -5, 0], resistors: [0, -5, 0] },
+    labels: { w_power: ["OUT+ → switch → 5V", [82.5, 56, 8]], w_buttons: ["Buttons → 2, 14, 45, 48", [96, 44.5, 9]], resistors: ["2 × 100k → GPIO 1", [95, 23, 4]] },
+    text: `<ol><li><b>Buttons:</b> one wire from each button and the shutter through the shelf slots to pins 2, 14, 45 and 48. Their other feet share one GND wire.</li>
+      <li><b>Power:</b> charge module OUT+ to the slide switch's middle leg; an outer leg to the board's 5V. OUT− to GND.</li>
+      <li><b>Battery level:</b> B+ → 100k → GPIO 1 → 100k → GND, the resistors in the space below the charge module.</li>
+      <li>Heat shrink every joint and tack each bundle down with a dot of hot glue.</li></ol>
+      ${kit([WIRE.white, "signals"], [WIRE.black, "GND"], [WIRE.red, "power"], [WIRE.green, "battery level"])}` },
+  { title: "Close the back", view: "back3q", show: [...ALL.filter(k => !["front_plate", "screws_front", "lens_ring", "vf_front"].includes(k))],
+    enter: { caps: [0, 0, -16], shutter_cap: [0, 14, 0], back_plate: [0, 0, -24], screws_back: [0, 0, -34], vf_back: [0, 0, -30] },
+    labels: { caps: ["Caps first", [93, 52, 0]], back_plate: ["Back plate", [26, 40, 0]], screws_back: ["4 × M2×4", [105, 5, -1.2]] },
+    text: `<ol><li>Drop the shutter cap into its hole in the top edge from inside.</li>
+      <li>Put the three button caps into the back plate's holes, flange inside.</li>
+      <li>Lay the plate on and screw it down with 4 × M2×4. Then glue the viewfinder trim around its window.</li></ol>
+      ${kit(["#ff8a3d", "3 caps + shutter cap"], ["#80848c", "4 × M2×4"])}` },
+  { title: "Close the front", view: "front3q", show: ALL,
+    enter: { front_plate: [0, 0, 24], screws_front: [0, 0, 34], lens_ring: [0, 0, 30], vf_front: [0, 0, 30] },
+    labels: { front_plate: ["Front plate", [26, 40, 15.1]], lens_ring: ["Lens ring", [72, 59.5, 17.5]], screws_front: ["4 × M2×4", [5, 5, 16.3]] },
+    text: `<ol><li>Screw on the front plate with 4 × M2×4. It clamps the camera in its cradle.</li>
+      <li>Glue on the lens ring and the front viewfinder trim.</li></ol>
+      ${kit(["#80848c", "4 × M2×4"], ["#ff8a3d", "lens ring, trim"])}` },
+  { title: "Done", view: "back3q", show: ALL, spin: true,
+    text: `<p>110 × 64 × 15.1 mm. Charge through the upper USB-C on the right-hand side; the lower one is the board's, for firmware.</p>
+      <p>Tap <b>Case shown</b> to hide the frame and plates and see the wiring inside, or step back to any stage.</p>
+      <p class="note">This is the v2 test-fit body. Hole positions, thicknesses and the USB-C heights are still estimates. Check them against your parts on the first print.</p>` },
+];
+
+// ------------------------------------------------------------------ scene
+const canvas = document.getElementById("gl");
+const stage = canvas.parentElement;
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+const labelRenderer = new CSS2DRenderer({ element: document.getElementById("labels") });
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(30, 1, 1, 2000);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.minDistance = 60;
+controls.maxDistance = 600;
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8299, 1.6));
+const key = new THREE.DirectionalLight(0xffffff, 2.2); key.position.set(-120, 160, -140); scene.add(key);
+const fill = new THREE.DirectionalLight(0xffffff, 1.0); fill.position.set(140, 60, 160); scene.add(fill);
+
+// Model space is a mirror of real space (X left to right seen from the back, Z back to front):
+// flip X once here, centred on the body.
+const root = new THREE.Group();
+root.scale.set(-1, 1, 1);
+root.position.set(BODY.W / 2, -BODY.H / 2, -BODY.D / 2);
+scene.add(root);
+
+const VIEWS = {
+  side: [1, 0.45, -0.55], backtop: [0.1, 0.5, -1], back3q: [0.42, 0.32, -1], front3q: [-0.42, 0.32, 1], top3q: [0.25, 1.1, -0.75], under: [-0.35, -0.55, -1],
+  back: [0, 0.02, -1], front: [0, 0.02, 1], top: [0, 1, -0.12],
+};
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const shot = /^#shot-\d+$/.test(location.hash);
+if (shot) document.body.classList.add("shot");
+
+const meshes = {};
+const grey = new THREE.Color("#9a94a6");
+const loader = new STLLoader();
+// All parts come in one JSON bundle of base64 binary STLs (cad/export_guide.py)
+const bundle = await (await fetch("models.json")).json();
+const unpack = b64 => Uint8Array.from(atob(b64), c => c.charCodeAt(0)).buffer;
+await Promise.all(ALL.map(async name => {
+  const geo = loader.parse(unpack(bundle[name]));
+  geo.computeVertexNormals();
+  const p = P[name];
+  const mat = new THREE.MeshStandardMaterial({ color: p.c, roughness: p.r ?? .5, metalness: p.m ?? 0,
+    transparent: p.o != null, opacity: p.o ?? 1, depthWrite: p.o == null,
+    emissive: p.e ? new THREE.Color(p.e) : new THREE.Color(0), side: THREE.DoubleSide });
+  const mesh = new THREE.Mesh(geo, mat);
+  if (p.o != null) mesh.renderOrder = 2;
+  geo.computeBoundingBox();
+  mesh.userData = { base: new THREE.Color(p.c), baseOpacity: p.o ?? 1, offset: new THREE.Vector3(),
+                    centre: geo.boundingBox.getCenter(new THREE.Vector3()),
+                    top: geo.boundingBox.getCenter(new THREE.Vector3()).setY(geo.boundingBox.max.y) };
+  root.add(mesh);
+  meshes[name] = mesh;
+}));
+document.getElementById("loading").remove();
+
+// ------------------------------------------------------------------ state and animation
+let stepIndex = 0, explode = 0, caseShown = true, anim = null, camAnim = null, spin = false;
+const labelObjs = [];
+const ease = t => 1 - Math.pow(1 - t, 3);
+
+// Frame whatever is on screen: the bounding sphere of the visible parts, in place
+function framing() {
+  placeAll(1);
+  root.updateMatrixWorld(true);
+  const box = new THREE.Box3();
+  for (const m of Object.values(meshes)) if (m.visible) box.expandByObject(m);
+  const sphere = box.getBoundingSphere(new THREE.Sphere());
+  const v = THREE.MathUtils.degToRad(camera.fov) / 2;
+  const h = Math.atan(Math.tan(v) * camera.aspect);
+  return { centre: sphere.center, dist: sphere.radius / Math.sin(Math.min(v, h)) * 0.98 };
+}
+function setView(name, instant) {
+  const f = framing();
+  const pos = new THREE.Vector3(...VIEWS[name]).normalize().multiplyScalar(f.dist).add(f.centre);
+  ["back", "front", "top"].forEach(k => document.getElementById("v-" + k).setAttribute("aria-pressed", String(k === name)));
+  if (instant || reduced) { camera.position.copy(pos); controls.target.copy(f.centre); return; }
+  camAnim = { from: camera.position.clone(), fromT: controls.target.clone(), to: pos, toT: f.centre.clone(), t0: performance.now(), dur: 900 };
+}
+function applyVisibility() {
+  const s = STEPS[stepIndex];
+  for (const [name, mesh] of Object.entries(meshes)) {
+    let vis = s.show.includes(name);
+    if (!caseShown && CASE.includes(name)) vis = false;
+    if (explode > .02 && P[name].wire) vis = false;
+    mesh.visible = vis;
+  }
+}
+function placeAll(progress) {
+  const s = STEPS[stepIndex];
+  const enter = s.enter || {};
+  const names = Object.keys(enter);
+  for (const [name, mesh] of Object.entries(meshes)) {
+    const ex = P[name].ex || [0, 0, 0];
+    const pos = new THREE.Vector3(ex[0] * explode, ex[1] * explode, ex[2] * explode);
+    const mat = mesh.material;
+    const isNew = name in enter;
+    let opacity = (s.ghost || []).includes(name) ? .2 : mesh.userData.baseOpacity;
+    if (isNew) {
+      const i = names.indexOf(name);
+      const t = Math.min(1, Math.max(0, (progress * (1 + names.length * .08) - i * .08)));
+      const k = ease(t);
+      pos.add(new THREE.Vector3(...enter[name]).multiplyScalar(1 - k));
+      opacity *= Math.min(1, t * 2.5);
+    }
+    mesh.position.copy(pos);
+    // parts from earlier steps fade back a little so the new ones stand out
+    const dim = (!isNew && names.length && s.enter) ? .38 : 0;
+    mat.color.copy(mesh.userData.base).lerp(grey, dim);
+    mat.opacity = opacity;
+    mat.transparent = opacity < 1;
+    mat.depthWrite = opacity >= 1 && P[name].o == null;
+  }
+}
+function setLabels() {
+  labelObjs.splice(0).forEach(o => o.parent.remove(o));
+  const s = STEPS[stepIndex];
+  if (!s.labels || explode > .02) return;
+  for (const [name, spec] of Object.entries(s.labels)) {
+    const mesh = meshes[name];
+    if (!mesh || !mesh.visible) continue;
+    const [text, at] = Array.isArray(spec) ? spec : [spec, null];
+    // CSS2DRenderer owns the outer element's transform, so the tag sits inside it, lifted
+    // above the anchor with a short leader, and never covers the part it names
+    const el = document.createElement("div");
+    const tag = document.createElement("div");
+    tag.className = "tag";
+    tag.textContent = text;
+    el.appendChild(tag);
+    const obj = new CSS2DObject(el);
+    obj.position.copy(at ? new THREE.Vector3(...at) : mesh.userData.top);
+    mesh.add(obj);
+    labelObjs.push(obj);
+  }
+}
+function render() {
+  document.getElementById("count").textContent = `Step ${stepIndex + 1} of ${STEPS.length}`;
+  document.getElementById("title").textContent = STEPS[stepIndex].title;
+  document.getElementById("text").innerHTML = STEPS[stepIndex].text;
+  document.getElementById("shotnum").textContent = `Step ${stepIndex + 1} of ${STEPS.length}`;
+  document.getElementById("shottitle").textContent = STEPS[stepIndex].title;
+  document.getElementById("prev").disabled = stepIndex === 0;
+  document.getElementById("next").textContent = stepIndex === STEPS.length - 1 ? "Start again" : "Next step";
+  [...document.getElementById("dots").children].forEach((b, i) => b.setAttribute("aria-current", i === stepIndex ? "step" : "false"));
+}
+function goTo(i, opts = {}) {
+  stepIndex = (i + STEPS.length) % STEPS.length;
+  const s = STEPS[stepIndex];
+  explode = s.explode ?? 0;
+  document.getElementById("ex").value = explode;
+  spin = !!s.spin && !reduced && !shot;
+  controls.autoRotate = spin;
+  controls.autoRotateSpeed = 1.2;
+  applyVisibility();
+  render();
+  setView(s.view, opts.instant);
+  anim = (reduced || opts.instant) ? null : { t0: performance.now(), dur: 1300 };
+  placeAll(anim ? 0 : 1);
+  setLabels();
+  try { history.replaceState(null, "", shot ? location.hash : `#step-${stepIndex + 1}`); } catch (e) {}
+}
+
+// ------------------------------------------------------------------ controls
+const dots = document.getElementById("dots");
+STEPS.forEach((s, i) => {
+  const b = document.createElement("button");
+  b.textContent = i + 1;
+  b.title = s.title;
+  b.setAttribute("aria-label", `Step ${i + 1}: ${s.title}`);
+  b.addEventListener("click", () => goTo(i));
+  dots.appendChild(b);
+});
+document.getElementById("next").addEventListener("click", () => goTo(stepIndex + 1));
+document.getElementById("prev").addEventListener("click", () => goTo(stepIndex - 1));
+document.getElementById("replay").addEventListener("click", () => goTo(stepIndex));
+for (const v of ["back", "front", "top"]) document.getElementById("v-" + v).addEventListener("click", () => { spin = false; controls.autoRotate = false; setView(v); });
+document.getElementById("t-case").addEventListener("click", e => {
+  caseShown = !caseShown;
+  e.currentTarget.setAttribute("aria-pressed", String(caseShown));
+  e.currentTarget.textContent = caseShown ? "Case shown" : "Case hidden";
+  applyVisibility(); setLabels();
+});
+document.getElementById("ex").addEventListener("input", e => {
+  explode = +e.target.value; anim = null; applyVisibility(); placeAll(1); setLabels();
+});
+addEventListener("hashchange", () => {
+  const m = location.hash.match(/^#(step|shot)-(\d+)$/);
+  if (m && +m[2] - 1 !== stepIndex) goTo(+m[2] - 1);
+});
+addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT") return;
+  if (e.key === "ArrowRight") goTo(stepIndex + 1);
+  if (e.key === "ArrowLeft") goTo(stepIndex - 1);
+});
+
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false);
+  labelRenderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage);
+resize();
+
+function tick(now) {
+  if (anim) {
+    const t = Math.min(1, (now - anim.t0) / anim.dur);
+    placeAll(t);
+    if (t >= 1) { anim = null; placeAll(1); }
+  }
+  if (camAnim) {
+    const t = ease(Math.min(1, (now - camAnim.t0) / camAnim.dur));
+    camera.position.lerpVectors(camAnim.from, camAnim.to, t);
+    controls.target.lerpVectors(camAnim.fromT, camAnim.toT, t);
+    if (t >= 1) camAnim = null;
+  }
+  controls.update();
+  renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+const start = shot ? +location.hash.slice(6) - 1 : (/^#step-\d+$/.test(location.hash) ? +location.hash.slice(6) - 1 : 0);
+goTo(Math.min(Math.max(start, 0), STEPS.length - 1), { instant: true });
+requestAnimationFrame(tick);
+window.__ready = true;
+</script>

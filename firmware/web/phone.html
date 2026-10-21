@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Digicam</title>
+<style>
+/* The camera's own web page, served over its Wi-Fi. No internet while connected, so
+   everything is inline and the fonts are the phone's own. */
+:root {
+  --bg: #f3f0f7; --card: #ffffff; --ink: #1d1a24; --muted: #6e6879; --line: #e2dcea;
+  --accent: #e8661c; --accent-ink: #ffffff; --lilac: #b9a4ec; --tick: #2e9e5b; --danger: #d23b3b;
+  --sheet: rgba(20, 18, 26, .55);
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #141218; --card: #1f1c25; --ink: #efebf5; --muted: #a49cb2; --line: #322d3b;
+          --accent: #ff8a3d; --accent-ink: #1a1208; --lilac: #c9b8f2; --tick: #4cc47a; --danger: #ff6b6b;
+          --sheet: rgba(0, 0, 0, .65); color-scheme: dark; }
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+header { position: sticky; top: 0; z-index: 5; background: var(--bg);
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) 16px 10px; display: flex; align-items: center; gap: 12px; }
+.who { flex: 1; min-width: 0; }
+.who h1 { margin: 0; font-size: 22px; font-weight: 750; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.who p { margin: 2px 0 0; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pill { font-size: 15px; font-weight: 600; padding: 7px 14px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); }
+.pill.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 0 3px calc(96px + env(safe-area-inset-bottom, 0px)); }
+.tile { position: relative; aspect-ratio: 4 / 3; background: var(--line); overflow: hidden; }
+.tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tile .badge { position: absolute; left: 6px; bottom: 5px; font-size: 11px; font-weight: 700; color: #fff;
+  background: rgba(0,0,0,.55); padding: 1px 6px; border-radius: 4px; }
+.tile .done { position: absolute; right: 5px; top: 5px; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--tick); color: #fff; font-size: 12px; display: grid; place-items: center; }
+.tile .pick { position: absolute; right: 5px; bottom: 5px; width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid #fff; background: rgba(0,0,0,.25); }
+.tile.sel .pick { background: var(--accent); border-color: var(--accent); }
+.tile.sel .pick::after { content: ""; position: absolute; left: 6px; top: 2px; width: 5px; height: 10px;
+  border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.tile.sel img { opacity: .75; }
+.empty { padding: 60px 24px; text-align: center; color: var(--muted); }
+.bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 12px);
+  background: var(--bg); border-top: 1px solid var(--line); display: flex; gap: 10px; align-items: center; }
+.bar .grow { flex: 1; font-size: 14px; color: var(--muted); }
+.btn { font-weight: 650; border-radius: 12px; padding: 12px 16px; white-space: nowrap; background: var(--card); border: 1px solid var(--line); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.danger { color: var(--danger); }
+.btn:disabled { opacity: .45; }
+.viewer { position: fixed; inset: 0; z-index: 10; background: #000; display: flex; flex-direction: column; }
+.viewer .top { display: flex; justify-content: space-between; align-items: center; color: #fff;
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) 14px 10px; font-size: 14px; }
+.viewer .stage { flex: 1; display: grid; place-items: center; min-height: 0; touch-action: pan-y; }
+.viewer img, .viewer canvas { max-width: 100%; max-height: 100%; display: block;
+  -webkit-touch-callout: default; user-select: auto; }
+.viewer .hint { color: #cfc9da; text-align: center; font-size: 14px; padding: 10px 20px 0; }
+.viewer .actions { display: flex; gap: 10px; justify-content: center; padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 14px); }
+.viewer .actions .btn { background: #26232c; border-color: #3a3642; color: #fff; }
+.viewer .actions .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.sheet { position: fixed; inset: 0; z-index: 20; background: var(--sheet); display: flex; align-items: flex-end; }
+.sheet > div { width: 100%; background: var(--card); border-radius: 18px 18px 0 0; max-height: 88%; overflow-y: auto;
+  padding: 20px 20px calc(env(safe-area-inset-bottom, 0px) + 20px); }
+.sheet h2 { margin: 0 0 6px; font-size: 20px; }
+.sheet ol { padding-left: 22px; margin: 10px 0 16px; }
+.sheet li { margin: 7px 0; }
+.sheet code { font: 600 14px ui-monospace, Menlo, monospace; background: var(--bg); padding: 1px 5px; border-radius: 4px; }
+.sheet .row { display: flex; gap: 10px; margin-top: 8px; }
+.sheet .row .btn { flex: 1; }
+.toast { position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 14px); transform: translateX(-50%); z-index: 30;
+  background: var(--ink); color: var(--bg); padding: 9px 16px; border-radius: 999px; font-size: 14px; font-weight: 600; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <div class="who"><h1 id="title">Digicam</h1><p id="sub">Connecting to the camera…</p></div>
+  <button class="pill" id="select">Select</button>
+</header>
+<main class="grid" id="grid"></main>
+<div class="empty" id="empty" hidden>No photos on the camera yet.<br>Take some, then come back.</div>
+
+<div class="bar" id="bar">
+  <span class="grow" id="barText"></span>
+  <button class="btn" id="selNew">Select new</button>
+  <button class="btn primary" id="save" disabled>Save to Photos</button>
+</div>
+
+<div class="viewer" id="viewer" hidden>
+  <div class="top"><button id="vClose" aria-label="Close">Close</button><span id="vPos"></span><span id="vName"></span></div>
+  <div class="stage" id="vStage"></div>
+  <div class="hint" id="vHint">Press and hold the photo, then tap <b>Save to Photos</b></div>
+  <div class="actions">
+    <button class="btn danger" id="vDelete">Delete</button>
+    <button class="btn primary" id="vSave">Save to Photos</button>
+  </div>
+</div>
+
+<div class="sheet" id="setup" hidden><div>
+  <h2>One-time setup to save many at once</h2>
+  <p>To save one photo, open it, press and hold, and tap <b>Save to Photos</b>. That needs no setup.</p>
+  <p>To save a whole selection in one go, add a free Shortcut once:</p>
+  <ol>
+    <li>Open the <b>Shortcuts</b> app and tap <b>+</b>. Name it exactly <code>Save from Digicam</code>.</li>
+    <li>Add <b>Split Text</b>. Set it to split <b>Shortcut Input</b> by <b>New Lines</b>.</li>
+    <li>Add <b>Repeat with Each</b> (it uses the Split Text).</li>
+    <li>Inside the repeat, add <b>Get Contents of URL</b> with <b>Repeat Item</b>.</li>
+    <li>Inside the repeat, add <b>Save to Photo Album</b> (Contents of URL). Pick an album such as Digicam.</li>
+    <li>Done. The first time, allow it to find devices on your local network.</li>
+  </ol>
+  <p>Or, if someone sent you the Shortcut as a link, open the link and tap <b>Add Shortcut</b>.</p>
+  <div class="row"><button class="btn" id="setupClose">Later</button><button class="btn primary" id="setupDone">I've added it</button></div>
+</div></div>
+
+<div class="sheet" id="confirm" hidden><div>
+  <h2 id="cTitle">Delete this photo?</h2>
+  <p id="cText">It's removed from the camera's card. Photos already saved to your phone stay.</p>
+  <div class="row"><button class="btn" id="cNo">Keep</button><button class="btn primary" id="cYes" style="background:var(--danger);border-color:var(--danger)">Delete</button></div>
+</div></div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script>
+"use strict";
+const SHORTCUT = "Save from Digicam";
+const base = location.origin + location.pathname.replace(/[^/]*$/, "");
+const $ = id => document.getElementById(id);
+let items = [], camera = "camera", selecting = false, picked = new Set(), saved = new Set(), current = -1;
+
+// ---------------------------------------------------------------- remembered on this phone
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(camera + ":" + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(camera + ":" + k, JSON.stringify(v)); } catch (e) {} },
+};
+
+function toast(text, ms = 2200) {
+  const t = $("toast");
+  t.textContent = text; t.hidden = false;
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => t.hidden = true, ms);
+}
+const mb = n => n > 1e6 ? (n / 1e6).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1e3)) + " KB";
+const isVideo = it => it.v === 1;
+
+// ---------------------------------------------------------------- loading
+async function load() {
+  try {
+    const r = await fetch(base + "api/list", { cache: "no-store" });
+    const d = await r.json();
+    items = d.items || [];
+    camera = d.camera || camera;
+    $("title").textContent = d.owner ? d.owner + "'s camera" : "Digicam";
+    const photos = items.filter(i => !isVideo(i)).length, videos = items.length - photos;
+    const parts = [photos + (photos === 1 ? " photo" : " photos")];
+    if (videos) parts.push(videos + (videos === 1 ? " video" : " videos"));
+    if (d.battery != null) parts.push("battery " + d.battery + "%");
+    $("sub").textContent = parts.join(" · ");
+    saved = new Set(store.get("saved", []));
+    afterShortcut();
+    render();
+  } catch (e) {
+    $("sub").textContent = "Can't reach the camera. Is your phone on the camera's Wi-Fi?";
+  }
+}
+
+// back from the Shortcut: ?saved=1 (or ?shortcut=missing when it isn't installed)
+function afterShortcut() {
+  const q = new URLSearchParams(location.search);
+  if (q.has("saved")) {
+    const pending = store.get("pending", []);
+    pending.forEach(n => saved.add(n));
+    store.set("saved", [...saved]);
+    store.set("pending", []);
+    store.set("shortcut", true);
+    if (pending.length) toast(`Saved ${pending.length} to Photos`);
+    picked.clear(); selecting = false;
+  } else if (q.has("shortcut")) {
+    store.set("shortcut", false);
+    $("setup").hidden = false;
+  }
+  if (q.toString()) history.replaceState(null, "", location.pathname);
+}
+
+// ---------------------------------------------------------------- grid
+function render() {
+  const g = $("grid");
+  g.textContent = "";
+  $("empty").hidden = items.length > 0;
+  items.forEach((it, i) => {
+    const t = document.createElement("button");
+    t.className = "tile" + (picked.has(it.n) ? " sel" : "");
+    t.setAttribute("aria-label", it.n);
+    const img = document.createElement("img");
+    img.loading = "lazy"; img.decoding = "async"; img.alt = "";
+    img.src = base + "thumb/" + it.n;
+    t.appendChild(img);
+    if (isVideo(it)) t.insertAdjacentHTML("beforeend", `<span class="badge">▶ video</span>`);
+    if (saved.has(it.n)) t.insertAdjacentHTML("beforeend", `<span class="done">✓</span>`);
+    if (selecting) t.insertAdjacentHTML("beforeend", `<span class="pick"></span>`);
+    t.addEventListener("click", () => selecting ? toggle(it, t) : open(i));
+    g.appendChild(t);
+  });
+  updateBar();
+}
+function toggle(it, el) {
+  if (isVideo(it)) { toast("Videos can't be saved to Photos yet"); return; }
+  picked.has(it.n) ? picked.delete(it.n) : picked.add(it.n);
+  el.classList.toggle("sel", picked.has(it.n));
+  updateBar();
+}
+function updateBar() {
+  $("select").textContent = selecting ? "Done" : "Select";
+  $("select").classList.toggle("on", selecting);
+  const fresh = items.filter(i => !isVideo(i) && !saved.has(i.n)).length;
+  $("selNew").hidden = !selecting || !fresh;
+  $("selNew").textContent = "All new";
+  $("save").disabled = selecting ? picked.size === 0 : fresh === 0;
+  if (selecting) {
+    $("barText").textContent = picked.size ? `${picked.size} picked` : "Tap to pick";
+    $("save").textContent = picked.size ? `Save ${picked.size}` : "Save";
+  } else {
+    $("barText").textContent = fresh ? `${fresh} not saved yet` : (items.length ? "All saved" : "");
+    $("save").textContent = fresh ? `Save ${fresh} new` : "Save to Photos";
+  }
+}
+$("select").addEventListener("click", () => { selecting = !selecting; if (!selecting) picked.clear(); render(); });
+$("selNew").addEventListener("click", () => {
+  items.forEach(i => { if (!isVideo(i) && !saved.has(i.n)) picked.add(i.n); });
+  render();
+});
+$("save").addEventListener("click", () => {
+  const names = selecting ? [...picked] : items.filter(i => !isVideo(i) && !saved.has(i.n)).map(i => i.n);
+  saveMany(names);
+});
+
+// ---------------------------------------------------------------- saving through the Shortcut
+function saveMany(names) {
+  if (!names.length) return;
+  if (store.get("shortcut", null) === null) { $("setup").hidden = false; pendingSave = names; return; }
+  store.set("pending", names);
+  const urls = names.map(n => base + "file/" + n).join("\n");
+  const enc = encodeURIComponent;
+  location.href = "shortcuts://x-callback-url/run-shortcut?name=" + enc(SHORTCUT) +
+    "&input=text&text=" + enc(urls) +
+    "&x-success=" + enc(base + "?saved=1") +
+    "&x-cancel=" + enc(base) +
+    "&x-error=" + enc(base + "?shortcut=missing");
+}
+let pendingSave = null;
+$("setupClose").addEventListener("click", () => { $("setup").hidden = true; pendingSave = null; });
+$("setupDone").addEventListener("click", () => {
+  store.set("shortcut", true);
+  $("setup").hidden = true;
+  if (pendingSave) { const n = pendingSave; pendingSave = null; saveMany(n); }
+});
+
+// ---------------------------------------------------------------- one photo at a time
+let player = null;
+function open(i) {
+  current = i;
+  const it = items[i];
+  $("viewer").hidden = false;
+  $("vPos").textContent = `${i + 1} of ${items.length}`;
+  $("vName").textContent = mb(it.s);
+  stopPlayer();
+  const st = $("vStage");
+  st.textContent = "";
+  if (isVideo(it)) {
+    $("vHint").textContent = "Videos play here. Saving them to Photos is coming in a later update.";
+    $("vSave").hidden = true;
+    const c = document.createElement("canvas");
+    st.appendChild(c);
+    playAvi(base + "file/" + it.n, c);
+  } else {
+    $("vHint").innerHTML = "Press and hold the photo, then tap <b>Save to Photos</b>";
+    $("vSave").hidden = false;
+    const img = document.createElement("img");
+    img.src = base + "file/" + it.n;
+    img.alt = it.n;
+    st.appendChild(img);
+  }
+}
+function closeViewer() { stopPlayer(); $("viewer").hidden = true; $("vStage").textContent = ""; current = -1; render(); }
+$("vClose").addEventListener("click", closeViewer);
+$("vSave").addEventListener("click", () => saveMany([items[current].n]));
+// swipe between photos
+let sx = null;
+$("vStage").addEventListener("touchstart", e => { sx = e.touches[0].clientX; }, { passive: true });
+$("vStage").addEventListener("touchend", e => {
+  if (sx === null) return;
+  const dx = e.changedTouches[0].clientX - sx; sx = null;
+  if (Math.abs(dx) < 60) return;
+  const n = current + (dx < 0 ? 1 : -1);
+  if (n >= 0 && n < items.length) open(n);
+});
+
+// The camera records MJPEG in an AVI: each '00dc' chunk is one JPEG frame.
+async function playAvi(url, canvas) {
+  const token = {};
+  player = token;
+  $("vName").textContent = "loading video…";
+  const buf = await (await fetch(url)).arrayBuffer();
+  if (player !== token) return;
+  const b = new Uint8Array(buf), dv = new DataView(buf);
+  const usPerFrame = dv.getUint32(32, true) || 66666;
+  const frames = [];
+  for (let p = 224; p + 8 <= b.length;) {
+    if (b[p] !== 0x30 || b[p + 1] !== 0x30 || b[p + 2] !== 0x64 || b[p + 3] !== 0x63) break;
+    const len = dv.getUint32(p + 4, true);
+    frames.push(b.subarray(p + 8, p + 8 + len));
+    p += 8 + len + (len & 1);
+  }
+  const fps = 1e6 / usPerFrame;
+  $("vName").textContent = (frames.length / fps).toFixed(1) + " s";
+  const ctx = canvas.getContext("2d");
+  let i = 0;
+  const step = async () => {
+    if (player !== token || !frames.length) return;
+    const bmp = await createImageBitmap(new Blob([frames[i]], { type: "image/jpeg" }));
+    if (canvas.width !== bmp.width) { canvas.width = bmp.width; canvas.height = bmp.height; }
+    ctx.drawImage(bmp, 0, 0);
+    i = (i + 1) % frames.length;
+    token.timer = setTimeout(step, usPerFrame / 1000);
+  };
+  step();
+}
+function stopPlayer() { if (player) clearTimeout(player.timer); player = null; }
+
+// ---------------------------------------------------------------- delete
+$("vDelete").addEventListener("click", () => { $("confirm").hidden = false; });
+$("cNo").addEventListener("click", () => { $("confirm").hidden = true; });
+$("cYes").addEventListener("click", async () => {
+  $("confirm").hidden = true;
+  const it = items[current];
+  try {
+    const r = await fetch(base + "api/delete", { method: "POST", body: it.n });
+    if (!(await r.json()).ok) throw new Error();
+    items.splice(current, 1);
+    toast("Deleted from the camera");
+    if (!items.length) closeViewer(); else open(Math.min(current, items.length - 1));
+  } catch (e) { toast("Couldn't delete it"); }
+});
+
+load();
+</script>
+</body>
+</html>
