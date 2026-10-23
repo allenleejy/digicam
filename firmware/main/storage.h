@@ -50,5 +50,12 @@ esp_err_t storage_delete(const char *name);
  * an internal-RAM bounce buffer in 16 KB pieces. Only call from one task. */
 size_t storage_fwrite(FILE *f, const void *buf, size_t len);
 
+/* The frame mailbox: /sdcard/frame.json, written by the phone page and read by the
+ * DigiGallery frame (see 10-frame-mailbox.md). Kept outside DCIM, so the photo list and
+ * the name check never see it. The camera stores it but doesn't act on it. */
+FILE *storage_frame_open(uint32_t *size);   /* NULL when there's no mailbox */
+/* Replace the mailbox. `buf` must be in internal RAM: the SD driver can't DMA from PSRAM. */
+esp_err_t storage_frame_save(const void *buf, size_t len);
+
 void storage_space(uint64_t *total, uint64_t *free_bytes);
 void storage_counts(int *photos, int *videos);

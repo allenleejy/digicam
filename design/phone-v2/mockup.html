@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Digicam phone app v2 mockup</title>
+<style>
+/* Static mockup of the redesigned phone page. Not the page itself: no camera, no script.
+   Photos: the four from the camera's card (bench shots) plus picsum placeholders, marked "sample". */
+@font-face { font-family: Spleen; src: url(spleen.woff) format("woff"); font-display: block; }
+
+.light {
+  --bg: #f5f3fa; --surface: #ffffff; --ink: #1c1922; --muted: #6c6676; --line: rgba(28, 25, 34, .09);
+  --glass: rgba(250, 249, 253, .72); --glass-line: rgba(28, 25, 34, .08);
+  --accent: #ff8a3d; --on-accent: #1c1922; --danger: #d93a3a; --tile: #e7e3ee;
+}
+.dark {
+  --bg: #16141c; --surface: #221f29; --ink: #f2eff7; --muted: #a39cae; --line: rgba(242, 239, 247, .09);
+  --glass: rgba(34, 31, 41, .72); --glass-line: rgba(242, 239, 247, .1);
+  --accent: #ff8a3d; --on-accent: #1c1922; --danger: #ff6b6b; --tile: #2a2632;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; padding: 40px; background: #d9d6df; font: 15px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; }
+.board { display: grid; grid-template-columns: repeat(auto-fill, 390px); gap: 48px 40px; justify-content: center; }
+figure { margin: 0; }
+figcaption { margin-top: 14px; font-size: 14px; color: #3d3946; max-width: 390px; }
+figcaption b { display: block; font-size: 15px; color: #1c1922; margin-bottom: 2px; }
+
+.phone { width: 390px; height: 844px; border-radius: 54px; overflow: hidden; position: relative;
+  background: var(--bg); color: var(--ink); box-shadow: 0 0 0 10px #1c1922, 0 30px 60px rgba(28, 25, 34, .25); }
+.status { height: 54px; display: flex; justify-content: space-between; align-items: center; padding: 0 34px 0 40px;
+  font-weight: 600; font-size: 16px; }
+.status .r { display: flex; gap: 6px; align-items: center; }
+.ico { width: 22px; height: 22px; flex: none; }
+.ico.s { width: 17px; height: 17px; }
+
+.pixel { font-family: Spleen, ui-monospace, monospace; font-weight: 400; -webkit-font-smoothing: none; letter-spacing: 0; }
+
+/* ---------- library */
+.head { padding: 6px 20px 14px; }
+.head h1 { margin: 0; font-size: 32px; line-height: 40px; }
+.meta { display: flex; gap: 14px; color: var(--muted); font-size: 14px; margin-top: 4px; align-items: center; }
+.meta span { display: inline-flex; gap: 5px; align-items: center; }
+.sec { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 20px 8px; }
+.sec h2 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
+.sec span { color: var(--muted); font-size: 14px; }
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
+.tile { aspect-ratio: 1; background: var(--tile) center / cover no-repeat; position: relative; }
+.tile .vid { position: absolute; left: 6px; bottom: 6px; color: #fff; display: flex; gap: 3px; align-items: center;
+  font-size: 12px; font-weight: 600; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
+.tile .saved { position: absolute; right: 6px; bottom: 6px; width: 20px; height: 20px; border-radius: 50%;
+  background: rgba(255,255,255,.92); color: #1c1922; display: grid; place-items: center; }
+.tile .saved .ico { width: 13px; height: 13px; }
+
+.dock { position: absolute; left: 16px; right: 16px; bottom: 30px; display: flex; gap: 8px; padding: 8px;
+  border-radius: 999px; background: var(--glass); border: 1px solid var(--glass-line);
+  -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%);
+  box-shadow: 0 10px 30px rgba(28, 25, 34, .14); }
+.btn { height: 48px; border-radius: 999px; padding: 0 20px; display: inline-flex; gap: 8px; align-items: center;
+  justify-content: center; font: 600 16px/1 inherit; font-family: inherit; border: 0; white-space: nowrap;
+  background: transparent; color: var(--ink); }
+.btn.primary { background: var(--accent); color: var(--on-accent); flex: 1; }
+.btn.quiet { background: var(--line); }
+.btn.round { width: 48px; padding: 0; }
+
+/* ---------- viewer */
+.viewer { background: #0d0c10; color: #f2eff7; }
+.viewer .bar { position: absolute; left: 0; right: 0; top: 54px; display: flex; justify-content: space-between;
+  align-items: center; padding: 6px 16px; }
+.chip { height: 40px; min-width: 40px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center;
+  gap: 6px; padding: 0 14px; background: rgba(255,255,255,.12); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
+.chip.ic { padding: 0; width: 40px; }
+.viewer .photo { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-58%); aspect-ratio: 4 / 3;
+  background: url(img/full.jpg) center / cover; }
+.viewer .hint { position: absolute; left: 50%; transform: translateX(-50%); bottom: 132px; white-space: nowrap;
+  font-size: 14px; color: #d8d2e2; display: flex; gap: 8px; align-items: center; }
+.viewer .hint i { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #d8d2e2; display: inline-block; position: relative; }
+.viewer .hint i::after { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: #d8d2e2; }
+.viewer .dock { background: rgba(34, 31, 41, .7); border-color: rgba(255,255,255,.08); box-shadow: none; }
+.viewer .dock .btn { color: #f2eff7; }
+.strip { position: absolute; left: 0; right: 0; bottom: 104px; display: flex; gap: 2px; justify-content: center; opacity: 0; }
+
+/* ---------- select */
+.selhead { display: flex; justify-content: space-between; align-items: center; padding: 6px 16px 12px; }
+.selhead h1 { margin: 0; font-size: 20px; font-weight: 700; }
+.tile .pick { position: absolute; right: 6px; bottom: 6px; width: 24px; height: 24px; border-radius: 50%;
+  border: 2px solid #fff; background: rgba(0,0,0,.18); box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+.tile.on::before { content: ""; position: absolute; inset: 0; background: rgba(22, 20, 28, .28); }
+.tile.on .pick { background: var(--accent); border-color: var(--accent); color: #1c1922; display: grid; place-items: center; }
+.tile.on .pick .ico { width: 14px; height: 14px; }
+.tile.on { outline: 3px solid var(--accent); outline-offset: -3px; }
+
+/* ---------- not connected */
+.away { padding: 40px 28px 0; }
+.away .mark { width: 72px; height: 72px; border-radius: 18px; background: url(icon-180.png) center / cover; }
+.away h1 { font-size: 32px; line-height: 40px; margin: 28px 0 6px; }
+.away p.lead { margin: 0 0 28px; color: var(--muted); font-size: 16px; max-width: 30ch; }
+.steps { display: grid; gap: 12px; }
+.step { display: grid; grid-template-columns: 32px 1fr; gap: 14px; align-items: start; padding: 16px; border-radius: 22px; background: var(--surface); }
+.step .n { width: 32px; height: 32px; border-radius: 50%; background: var(--line); display: grid; place-items: center; font-size: 16px; }
+.step b { display: block; font-size: 16px; margin-bottom: 2px; }
+.step span { color: var(--muted); font-size: 14px; }
+.ssid { display: inline-block; margin-top: 8px; padding: 6px 12px; border-radius: 999px; background: var(--line); color: var(--ink); font-size: 16px; }
+.looking { margin-top: 26px; display: flex; gap: 10px; align-items: center; color: var(--muted); font-size: 14px; }
+.looking .pulse { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 6px rgba(255,138,61,.2); }
+
+/* ---------- add to home screen (first visit, in Safari) */
+.safari-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 92px; background: var(--glass); border-top: 1px solid var(--glass-line);
+  display: flex; justify-content: center; padding-top: 12px; color: var(--muted); font-size: 14px; }
+.safari-bar .url { height: 44px; width: 340px; border-radius: 14px; background: var(--line); display: grid; place-items: center; }
+.dim { position: absolute; inset: 0; background: rgba(22, 20, 28, .45); }
+.sheet { position: absolute; left: 8px; right: 8px; bottom: 8px; border-radius: 40px; background: var(--surface); padding: 28px 24px 24px; }
+.sheet .grab { width: 36px; height: 5px; border-radius: 3px; background: var(--line); margin: -14px auto 18px; }
+.sheet .app { display: flex; gap: 14px; align-items: center; }
+.sheet .app .mark { width: 60px; height: 60px; border-radius: 14px; background: url(icon-180.png) center / cover; flex: none; }
+.sheet h2 { margin: 0; font-size: 22px; letter-spacing: -.01em; }
+.sheet .app p { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+.how { list-style: none; padding: 0; margin: 22px 0 22px; display: grid; gap: 14px; }
+.how li { display: flex; gap: 12px; align-items: center; font-size: 16px; }
+.how .k { width: 36px; height: 36px; border-radius: 10px; background: var(--line); display: grid; place-items: center; flex: none; color: #2f7cf6; }
+.dark .how .k { color: #4c94ff; }
+.sheet .row { display: flex; gap: 8px; }
+.sheet .row .btn { flex: 1; }
+</style>
+</head>
+<body>
+<div class="board">
+
+<!-- 1. Library -->
+<figure>
+<div class="phone light">
+  <div class="status"><span>9:41</span><span class="r"><svg class="ico s"><use href="sprite.svg#battery-high"/></svg></span></div>
+  <div class="head">
+    <h1 class="pixel">sam's camera</h1>
+    <div class="meta"><span>24 photos</span><span>2 videos</span><span><svg class="ico s"><use href="sprite.svg#battery-high"/></svg>80%</span></div>
+  </div>
+  <div class="sec"><h2>New</h2><span>6 not saved</span></div>
+  <div class="grid" id="g-new"></div>
+  <div class="sec"><h2>Saved</h2><span>20</span></div>
+  <div class="grid" id="g-saved"></div>
+  <div class="dock">
+    <button class="btn quiet">Select</button>
+    <button class="btn primary"><svg class="ico"><use href="sprite.svg#download-simple"/></svg>Save 6 new</button>
+  </div>
+</div>
+<figcaption><b>Library</b>The camera's name in its own pixel font. New photos come first, so the main button always does the obvious thing. One floating bar, like Photos.</figcaption>
+</figure>
+
+<!-- 2. Viewer -->
+<figure>
+<div class="phone viewer">
+  <div class="status"><span>9:41</span><span class="r"><svg class="ico s"><use href="sprite.svg#battery-high"/></svg></span></div>
+  <div class="bar">
+    <span class="chip ic"><svg class="ico"><use href="sprite.svg#x"/></svg></span>
+    <span class="chip pixel" style="font-size:16px">03/24</span>
+    <span class="chip" style="font-size:14px">142 KB</span>
+  </div>
+  <div class="photo"></div>
+  <div class="hint"><i></i>Press and hold the photo to save it</div>
+  <div class="dock">
+    <button class="btn round"><svg class="ico"><use href="sprite.svg#trash"/></svg></button>
+    <button class="btn primary"><svg class="ico"><use href="sprite.svg#download-simple"/></svg>Save</button>
+    <button class="btn round"><svg class="ico"><use href="sprite.svg#export"/></svg></button>
+  </div>
+</div>
+<figcaption><b>Viewer</b>Always dark, so the photo is the brightest thing on screen. Swipe sideways between photos, swipe down to close. The hint shows the first few times only.</figcaption>
+</figure>
+
+<!-- 3. Select, dark mode -->
+<figure>
+<div class="phone dark">
+  <div class="status"><span>9:41</span><span class="r"><svg class="ico s"><use href="sprite.svg#battery-high"/></svg></span></div>
+  <div class="selhead">
+    <button class="btn quiet" style="height:40px">Cancel</button>
+    <h1>4 selected</h1>
+    <button class="btn quiet" style="height:40px">All new</button>
+  </div>
+  <div class="grid" id="g-sel"></div>
+  <div class="dock">
+    <button class="btn round"><svg class="ico"><use href="sprite.svg#trash"/></svg></button>
+    <button class="btn primary"><svg class="ico"><use href="sprite.svg#download-simple"/></svg>Save 4 to Photos</button>
+  </div>
+</div>
+<figcaption><b>Select (dark mode)</b>Drag across tiles to pick several at once. Picked tiles get an orange ring as well as the tick, so they're easy to spot at a glance.</figcaption>
+</figure>
+
+<!-- 4. Not connected -->
+<figure>
+<div class="phone light">
+  <div class="status"><span>9:41</span><span class="r"><svg class="ico s"><use href="sprite.svg#wifi-slash"/></svg></span></div>
+  <div class="away">
+    <div class="mark"></div>
+    <h1 class="pixel">hi, sam</h1>
+    <p class="lead">Your camera isn't connected. Two steps and your photos show up here.</p>
+    <div class="steps">
+      <div class="step"><span class="n pixel">1</span><div><b>Turn on Phone mode</b><span>On the camera, hold the middle button and pick the phone.</span></div></div>
+      <div class="step"><span class="n pixel">2</span><div><b>Join the camera's Wi-Fi</b><span>Settings, then Wi-Fi. It's saved, so no password this time.</span><br><span class="ssid pixel">digicam-sam</span></div></div>
+    </div>
+    <div class="looking"><span class="pulse"></span>Looking for the camera</div>
+  </div>
+</div>
+<figcaption><b>Not connected</b>What the home-screen app shows when opened away from the camera, if iOS keeps a copy of the page (to test). It keeps checking and opens the library by itself once the camera appears.</figcaption>
+</figure>
+
+<!-- 5. Add to Home Screen -->
+<figure>
+<div class="phone dark">
+  <div class="status"><span>9:41</span><span class="r"><svg class="ico s"><use href="sprite.svg#battery-high"/></svg></span></div>
+  <div class="head"><h1 class="pixel">sam's camera</h1><div class="meta"><span>24 photos</span><span>2 videos</span></div></div>
+  <div class="grid" id="g-bg"></div>
+  <div class="safari-bar"><div class="url">192.168.4.1</div></div>
+  <div class="dim"></div>
+  <div class="sheet">
+    <div class="grab"></div>
+    <div class="app"><div class="mark"></div><div><h2>Keep Digicam on your Home Screen</h2><p>Opens full screen, like an app. Free, once.</p></div></div>
+    <ul class="how">
+      <li><span class="k"><svg class="ico"><use href="sprite.svg#export"/></svg></span>Tap Share in Safari's toolbar</li>
+      <li><span class="k"><svg class="ico"><use href="sprite.svg#plus-square"/></svg></span>Choose Add to Home Screen</li>
+      <li><span class="k"><svg class="ico" style="color:var(--accent)"><use href="sprite.svg#camera"/></svg></span>Open Digicam from there next time</li>
+    </ul>
+    <div class="row"><button class="btn quiet">Not now</button><button class="btn primary">Show me</button></div>
+  </div>
+</div>
+<figcaption><b>First visit, in Safari</b>A one-time card asking to add the page to the Home Screen. It never shows inside the home-screen app itself.</figcaption>
+</figure>
+
+</div>
+<script>
+// fill the grids: the camera's own four photos first, then picsum samples
+const real = ["DSC_0006", "DSC_0005", "DSC_0004", "DSC_0003"].map(n => `img/t_${n}.JPG`);
+const sample = i => `https://picsum.photos/seed/digicam-roll-${i}/300/300`;
+function fill(id, n, opts = {}) {
+  const g = document.getElementById(id);
+  for (let i = 0; i < n; i++) {
+    const t = document.createElement("div");
+    t.className = "tile";
+    const src = (opts.realFirst && i < real.length) ? real[i] : sample(i + (opts.offset || 0));
+    t.style.backgroundImage = `url(${src})`;
+    if (opts.video && opts.video.includes(i))
+      t.insertAdjacentHTML("beforeend", `<span class="vid"><svg class="ico s"><use href="sprite.svg#play-fill"/></svg>0:12</span>`);
+    if (opts.saved) t.insertAdjacentHTML("beforeend", `<span class="saved"><svg class="ico"><use href="sprite.svg#check"/></svg></span>`);
+    if (opts.pick) {
+      const on = opts.pick.includes(i);
+      if (on) t.classList.add("on");
+      t.insertAdjacentHTML("beforeend", `<span class="pick">${on ? '<svg class="ico"><use href="sprite.svg#check"/></svg>' : ""}</span>`);
+    }
+    g.appendChild(t);
+  }
+}
+fill("g-new", 6, { realFirst: true, video: [4] });
+fill("g-saved", 9, { saved: true, offset: 10 });
+fill("g-sel", 18, { realFirst: true, offset: 20, pick: [0, 1, 4, 7], video: [5] });
+fill("g-bg", 15, { realFirst: true, offset: 40 });
+</script>
+</body>
+</html>

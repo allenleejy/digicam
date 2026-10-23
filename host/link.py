@@ -5,7 +5,9 @@ Laptop -> device: one JSON command per line.
 """
 
 import collections
+import glob
 import itertools
+import os
 import json
 import struct
 import threading
@@ -52,6 +54,7 @@ class Link:
         self.last_rx = 0.0          # time of the last good frame of any type
         self.crc_errors = 0
         self.running = True
+        self.reopened = False
         self.reader = threading.Thread(target=self._read_loop, daemon=True)
         self.reader.start()
 
@@ -63,13 +66,38 @@ class Link:
             try:
                 chunk = self.ser.read(65536)
             except serial.SerialException as e:
-                self._log(f"[host] serial error: {e}")
-                time.sleep(0.5)
+                # Unplugged (or the cable moved): wait for the port to come back and reopen it
+                self._log(f"[host] lost the board ({e}), waiting for it to come back")
+                buf.clear()
+                self._reopen()
                 continue
             if chunk:
                 self.bytes_in += len(chunk)
                 buf += chunk
                 self._parse(buf)
+
+    def _reopen(self):
+        try:
+            self.ser.close()
+        except serial.SerialException:
+            pass
+        while self.running:
+            time.sleep(1)
+            if not os.path.exists(self.port_name):
+                # the Mac may give the board a new name after a replug (wchusbserial110 -> 120)
+                others = glob.glob("/dev/cu.wchusbserial*") + glob.glob("/dev/cu.usbserial*")
+                if len(others) != 1:
+                    continue
+                self.port_name = self.ser.port = others[0]
+            try:
+                self.ser.dtr = False
+                self.ser.rts = False
+                self.ser.open()
+            except serial.SerialException:
+                continue
+            self.reopened = True     # the bridge says hello again, which restarts the preview stream
+            self._log("[host] board is back")
+            return
 
     def _parse(self, buf):
         while True:

@@ -101,6 +101,10 @@
     font: 11px/1.25 "SF Mono", ui-monospace, Menlo, monospace;
   }
   .layer { position: absolute; inset: 0; }
+  /* the camera's real screen, copied from the board about twice a second */
+  .mirror { z-index: 5; background: #000; display: grid; place-items: center; }
+  .mirror img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+  .nolink { z-index: 6; }
   .hidden { display: none !important; }
   #live { width: 100%; height: 100%; object-fit: cover; display: block; }
   .bar { position: absolute; left: 0; right: 0; height: 22px; display: flex; align-items: center; gap: 6px;
@@ -251,6 +255,7 @@
             <div class="layer nolink hidden" id="v-nolink">Waiting for the camera board…</div>
             <div class="toast hidden" id="toast"></div>
             <div class="dim" id="dim"></div>
+            <div class="layer mirror" id="v-mirror"><img id="mirror" alt="The camera's screen"></div>
           </div>
         </div>
       </div>
@@ -278,10 +283,11 @@
     <div class="card">
       <h2>Controls</h2>
       <table class="keys">
-        <tr><td>Shutter</td><td><kbd>Space</kbd> or click. Photo, or start/stop video. In the gallery: back to live view.</td></tr>
-        <tr><td>◀ ▶</td><td><kbd>←</kbd> <kbd>→</kbd> or click. Live view: film look. Gallery: previous/next.</td></tr>
-        <tr><td>Press ●</td><td><kbd>Enter</kbd> or click. Live view: open gallery. Gallery: back.</td></tr>
-        <tr><td>Hold ●</td><td>Hold <kbd>Enter</kbd> or ● for 0.6 s. Live view: photo/video mode. Gallery: delete.</td></tr>
+        <tr><td colspan="2">These press the camera's real buttons, and the screen above is a copy of the camera's own screen.</td></tr>
+        <tr><td>Shutter</td><td><kbd>Space</kbd> or click. Photo, or start/stop video. In menus: back to live view.</td></tr>
+        <tr><td>◀ ▶</td><td><kbd>←</kbd> <kbd>→</kbd> or click. Live view: film look. Menus and gallery: move.</td></tr>
+        <tr><td>Press ●</td><td><kbd>Enter</kbd> or click. Live view: gallery. Menus: choose.</td></tr>
+        <tr><td>Hold ●</td><td>Hold <kbd>Enter</kbd> or ● for 0.6 s. Opens the mode dial: Photo, Video, <b>Phone</b>, Settings.</td></tr>
         <tr><td>Power</td><td><kbd>P</kbd> or click the switch on the top edge.</td></tr>
       </table>
       <div class="btns">
@@ -594,7 +600,14 @@ async function deleteItem() {
 // ---------------------------------------------------------------- the four inputs
 function ready() { return st.connected && st.power && st.booted && !st.busy; }
 
+// Firmware 0.3 runs its own menus, so the buttons go straight to the board
+const REAL = true;
+async function press(b) {
+  try { await fetch('/api/cmd', { method: 'POST', body: JSON.stringify({ cmd: 'btn', b }) }); } catch (e) {}
+  mirrorSoon();
+}
 function onShutter() {
+  if (REAL) return press('shutter');
   if (!st.power) return;
   if (wake() || !ready()) return;
   if (st.view === 'gallery') {
@@ -605,6 +618,7 @@ function onShutter() {
   else st.rec ? stopRec() : startRec();
 }
 function onTurn(d) {
+  if (REAL) return press(d < 0 ? 'left' : 'right');
   if (!st.power) return;
   if (wake() || !ready()) return;
   if (st.view === 'gallery') {
@@ -615,6 +629,7 @@ function onTurn(d) {
   changeLook(d);
 }
 function onPress() {
+  if (REAL) return press('ok');
   if (!st.power) return;
   if (wake() || !ready()) return;
   if (st.view === 'gallery') return st.confirm ? deleteItem() : closeGallery();
@@ -622,6 +637,7 @@ function onPress() {
   openGallery();
 }
 function onHold() {
+  if (REAL) return press('hold');
   if (!st.power) return;
   if (wake() || !ready()) return;
   if (st.view === 'gallery') {
@@ -633,6 +649,27 @@ function onHold() {
   }
   toggleMode();
 }
+
+// ---------------------------------------------------------------- mirror of the camera's screen
+let mirrorTimer = null, mirrorBusy = false, mirrorUrl = null;
+async function mirrorTick() {
+  clearTimeout(mirrorTimer);
+  if (mirrorBusy) return;
+  mirrorBusy = true;
+  let wait = 400;
+  try {
+    const r = await fetch('/api/lcd.png?t=' + Date.now());
+    if (!r.ok) throw new Error();
+    const url = URL.createObjectURL(await r.blob());
+    $('mirror').src = url;
+    if (mirrorUrl) URL.revokeObjectURL(mirrorUrl);
+    mirrorUrl = url;
+  } catch (e) { wait = 1500; }
+  mirrorBusy = false;
+  mirrorTimer = setTimeout(mirrorTick, document.hidden ? 3000 : wait);
+}
+function mirrorSoon() { clearTimeout(mirrorTimer); setTimeout(mirrorTick, 120); }
+mirrorTick();
 
 // press vs hold, for both the mouse on ● and the Enter key
 function holdable(down, el) {

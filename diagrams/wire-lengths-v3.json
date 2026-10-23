@@ -1,0 +1,22 @@
+{
+ "clear": {
+  "Battery + / \u2212 to charge module B+ / B\u2212": 85,
+  "Module OUT+ to switch (middle leg)": 90,
+  "Switch (end leg) to board 5V": 70,
+  "Module OUT\u2212 to board GND": 115,
+  "Battery level: module B+ to the divider at GPIO 1": 120,
+  "Shutter to GPIO 48 and GND": 100,
+  "Buttons: left, OK, right + GND (4 wires)": 40,
+  "Screen (8 wires), through the sled's slot": 50
+ },
+ "retro": {
+  "Battery + / \u2212 to charge module B+ / B\u2212": 85,
+  "Module OUT+ to switch (middle leg)": 70,
+  "Switch (end leg) to board 5V": 90,
+  "Module OUT\u2212 to board GND": 115,
+  "Battery level: module B+ to the divider at GPIO 1": 120,
+  "Shutter to GPIO 48 and GND": 60,
+  "Buttons: left, OK, right + GND (4 wires)": 40,
+  "Screen (8 wires), through the sled's slot": 50
+ }
+}

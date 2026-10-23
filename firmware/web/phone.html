@@ -42,6 +42,9 @@ header { position: sticky; top: 0; z-index: 5; background: var(--bg);
 .tile.sel .pick::after { content: ""; position: absolute; left: 6px; top: 2px; width: 5px; height: 10px;
   border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
 .tile.sel img { opacity: .75; }
+.tile .frm { position: absolute; left: 5px; top: 5px; width: 20px; height: 20px; border-radius: 6px;
+  background: rgba(0,0,0,.55); color: #fff; display: grid; place-items: center; }
+.tile .frm svg { width: 13px; height: 13px; }
 .empty { padding: 60px 24px; text-align: center; color: var(--muted); }
 .bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 12px);
   background: var(--bg); border-top: 1px solid var(--line); display: flex; gap: 10px; align-items: center; }
@@ -50,6 +53,8 @@ header { position: sticky; top: 0; z-index: 5; background: var(--bg);
 .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .btn.danger { color: var(--danger); }
 .btn:disabled { opacity: .45; }
+.bar.selecting .grow { display: none; }
+.bar.selecting .btn { padding: 12px 13px; }
 .viewer { position: fixed; inset: 0; z-index: 10; background: #000; display: flex; flex-direction: column; }
 .viewer .top { display: flex; justify-content: space-between; align-items: center; color: #fff;
   padding: calc(env(safe-area-inset-top, 0px) + 10px) 14px 10px; font-size: 14px; }
@@ -69,14 +74,23 @@ header { position: sticky; top: 0; z-index: 5; background: var(--bg);
 .sheet code { font: 600 14px ui-monospace, Menlo, monospace; background: var(--bg); padding: 1px 5px; border-radius: 4px; }
 .sheet .row { display: flex; gap: 10px; margin-top: 8px; }
 .sheet .row .btn { flex: 1; }
+.opt { margin: 14px 0 0; }
+.opt > span { display: block; font-size: 14px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button { font-size: 15px; font-weight: 600; padding: 7px 13px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); }
+.seg button.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.link { color: var(--accent); font-weight: 650; }
+.sheet .btn.wide { width: 100%; margin-top: 18px; }
 .toast { position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 14px); transform: translateX(-50%); z-index: 30;
-  background: var(--ink); color: var(--bg); padding: 9px 16px; border-radius: 999px; font-size: 14px; font-weight: 600; }
+  background: var(--ink); color: var(--bg); padding: 9px 16px; border-radius: 18px; font-size: 14px; font-weight: 600;
+  max-width: calc(100% - 32px); width: max-content; text-align: center; }
 [hidden] { display: none !important; }
 </style>
 </head>
 <body>
 <header>
   <div class="who"><h1 id="title">Digicam</h1><p id="sub">Connecting to the camera…</p></div>
+  <button class="pill" id="frameBtn" hidden>Frame</button>
   <button class="pill" id="select">Select</button>
 </header>
 <main class="grid" id="grid"></main>
@@ -85,6 +99,7 @@ header { position: sticky; top: 0; z-index: 5; background: var(--bg);
 <div class="bar" id="bar">
   <span class="grow" id="barText"></span>
   <button class="btn" id="selNew">Select new</button>
+  <button class="btn" id="sendFrame" hidden>Send to frame</button>
   <button class="btn primary" id="save" disabled>Save to Photos</button>
 </div>
 
@@ -94,6 +109,7 @@ header { position: sticky; top: 0; z-index: 5; background: var(--bg);
   <div class="hint" id="vHint">Press and hold the photo, then tap <b>Save to Photos</b></div>
   <div class="actions">
     <button class="btn danger" id="vDelete">Delete</button>
+    <button class="btn" id="vFrame" hidden>Add to frame</button>
     <button class="btn primary" id="vSave">Save to Photos</button>
   </div>
 </div>
@@ -114,6 +130,19 @@ header { position: sticky; top: 0; z-index: 5; background: var(--bg);
   <div class="row"><button class="btn" id="setupClose">Later</button><button class="btn primary" id="setupDone">I've added it</button></div>
 </div></div>
 
+<div class="sheet" id="frameSheet" hidden><div>
+  <h2>Photo frame</h2>
+  <p id="fCount"></p>
+  <p id="fOrphans" hidden><span id="fOrphanText"></span> <button class="link" id="fOrphansOff">Take them off</button></p>
+  <div class="opt"><span>Change every</span><div class="seg" data-key="interval"></div></div>
+  <div class="opt"><span>Transition</span><div class="seg" data-key="transition"></div></div>
+  <div class="opt"><span>Look</span><div class="seg" data-key="look"></div></div>
+  <div class="opt"><span>Order</span><div class="seg" data-key="order"></div></div>
+  <div class="opt"><span>Brightness</span><div class="seg" data-key="brightness"></div></div>
+  <button class="btn danger wide" id="fClear">Take all photos off the frame</button>
+  <div class="row" style="margin-top:10px"><button class="btn primary" id="fDone">Done</button></div>
+</div></div>
+
 <div class="sheet" id="confirm" hidden><div>
   <h2 id="cTitle">Delete this photo?</h2>
   <p id="cText">It's removed from the camera's card. Photos already saved to your phone stay.</p>
@@ -128,6 +157,21 @@ const SHORTCUT = "Save from Digicam";
 const base = location.origin + location.pathname.replace(/[^/]*$/, "");
 const $ = id => document.getElementById(id);
 let items = [], camera = "camera", selecting = false, picked = new Set(), saved = new Set(), current = -1;
+
+// The frame mailbox (GET/POST api/frame): which photos the DigiGallery frame shows, and how.
+// Keys stay in this order, settings before "items": the frame reads the document as it streams in.
+const FRAME_MAX = 300;
+const FRAME_DEFAULTS = { v: 1, rev: 0, interval: 10, transition: "fade", look: "vivid", order: "newest", brightness: 100 };
+const FRAME_OPTIONS = {
+  interval: [[5, "5 s"], [10, "10 s"], [30, "30 s"], [60, "1 min"], [300, "5 min"]],
+  transition: [["cut", "Cut"], ["fade", "Fade"], ["slide", "Slide"]],
+  look: [["natural", "Natural"], ["contrast", "Contrast"], ["vivid", "Vivid"], ["warm", "Warm"]],
+  order: [["newest", "Newest first"], ["oldest", "Oldest first"], ["shuffle", "Shuffle"]],
+  brightness: [[30, "Low"], [60, "Medium"], [100, "High"]],
+};
+const FRAME_ICON = '<svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40ZM156,88a12,12,0,1,1-12,12A12,12,0,0,1,156,88Zm60,112H40V160.69l46.34-46.35a8,8,0,0,1,11.32,0h0L165,181.66a8,8,0,0,0,11.32-11.32l-17.66-17.65L173,138.34a8,8,0,0,1,11.31,0L216,170.07V200Z"/></svg>';
+let frame = { ...FRAME_DEFAULTS, items: [] };
+let frameReady = false;   // only save once the camera's copy has been read, so nothing is overwritten
 
 // ---------------------------------------------------------------- remembered on this phone
 const store = {
@@ -147,8 +191,12 @@ const isVideo = it => it.v === 1;
 // ---------------------------------------------------------------- loading
 async function load() {
   try {
-    const r = await fetch(base + "api/list", { cache: "no-store" });
+    const [r, fr] = await Promise.all([
+      fetch(base + "api/list", { cache: "no-store" }),
+      fetch(base + "api/frame", { cache: "no-store" }).catch(() => null),
+    ]);
     const d = await r.json();
+    await readFrame(fr);
     items = d.items || [];
     camera = d.camera || camera;
     $("title").textContent = d.owner ? d.owner + "'s camera" : "Digicam";
@@ -198,6 +246,7 @@ function render() {
     t.appendChild(img);
     if (isVideo(it)) t.insertAdjacentHTML("beforeend", `<span class="badge">▶ video</span>`);
     if (saved.has(it.n)) t.insertAdjacentHTML("beforeend", `<span class="done">✓</span>`);
+    if (onFrame(it.n)) t.insertAdjacentHTML("beforeend", `<span class="frm" title="On the frame">${FRAME_ICON}</span>`);
     if (selecting) t.insertAdjacentHTML("beforeend", `<span class="pick"></span>`);
     t.addEventListener("click", () => selecting ? toggle(it, t) : open(i));
     g.appendChild(t);
@@ -215,6 +264,9 @@ function updateBar() {
   $("select").classList.toggle("on", selecting);
   const fresh = items.filter(i => !isVideo(i) && !saved.has(i.n)).length;
   $("selNew").hidden = !selecting || !fresh;
+  $("bar").classList.toggle("selecting", selecting);
+  $("sendFrame").hidden = !selecting || !frameReady;
+  $("sendFrame").disabled = ![...picked].some(n => !n.endsWith(".AVI"));
   $("selNew").textContent = "All new";
   $("save").disabled = selecting ? picked.size === 0 : fresh === 0;
   if (selecting) {
@@ -270,12 +322,14 @@ function open(i) {
   if (isVideo(it)) {
     $("vHint").textContent = "Videos play here. Saving them to Photos is coming in a later update.";
     $("vSave").hidden = true;
+    $("vFrame").hidden = true;
     const c = document.createElement("canvas");
     st.appendChild(c);
     playAvi(base + "file/" + it.n, c);
   } else {
     $("vHint").innerHTML = "Press and hold the photo, then tap <b>Save to Photos</b>";
     $("vSave").hidden = false;
+    viewerFrameButton();
     const img = document.createElement("img");
     img.src = base + "file/" + it.n;
     img.alt = it.n;
@@ -329,18 +383,151 @@ async function playAvi(url, canvas) {
 function stopPlayer() { if (player) clearTimeout(player.timer); player = null; }
 
 // ---------------------------------------------------------------- delete
-$("vDelete").addEventListener("click", () => { $("confirm").hidden = false; });
-$("cNo").addEventListener("click", () => { $("confirm").hidden = true; });
-$("cYes").addEventListener("click", async () => {
-  $("confirm").hidden = true;
+let onConfirm = null;
+function confirmSheet(title, text, yes, action) {
+  $("cTitle").textContent = title;
+  $("cText").textContent = text;
+  $("cYes").textContent = yes;
+  onConfirm = action;
+  $("confirm").hidden = false;
+}
+$("cNo").addEventListener("click", () => { $("confirm").hidden = true; onConfirm = null; });
+$("cYes").addEventListener("click", () => { $("confirm").hidden = true; const a = onConfirm; onConfirm = null; if (a) a(); });
+$("vDelete").addEventListener("click", () => {
+  const vid = isVideo(items[current]);
+  confirmSheet(`Delete this ${vid ? "video" : "photo"}?`,
+    "It's removed from the camera's card. Photos already saved to your phone stay.", "Delete", deleteCurrent);
+});
+async function deleteCurrent() {
   const it = items[current];
   try {
     const r = await fetch(base + "api/delete", { method: "POST", body: it.n });
     if (!(await r.json()).ok) throw new Error();
     items.splice(current, 1);
     toast("Deleted from the camera");
+    if (onFrame(it.n)) removeFromFrame([it.n]);
     if (!items.length) closeViewer(); else open(Math.min(current, items.length - 1));
   } catch (e) { toast("Couldn't delete it"); }
+}
+
+// ---------------------------------------------------------------- the frame mailbox
+const onFrame = n => frame.items.some(i => i.n === n);
+const num = n => parseInt(n.slice(4, 8), 10) || 0;
+
+async function readFrame(fr) {
+  if (!fr) { frameReady = false; return; }                 // couldn't ask: try again next load
+  if (fr.status === 404) { frameReady = false; $("frameBtn").hidden = true; return; }   // older firmware
+  let doc = {};
+  if (fr.status === 200) {
+    try { doc = await fr.json(); } catch (e) { doc = {}; }
+  } else if (fr.status !== 204) { frameReady = false; return; }
+  const list = Array.isArray(doc.items) ? doc.items.filter(i => i && typeof i.n === "string" && /^DSC_\d{4}\.JPG$/.test(i.n)) : [];
+  frame = { ...FRAME_DEFAULTS };
+  for (const k of Object.keys(FRAME_DEFAULTS)) if (doc[k] !== undefined) frame[k] = doc[k];
+  frame.v = 1;
+  frame.rev = Number.isInteger(doc.rev) ? doc.rev : 0;
+  frame.items = list.map(i => ({ n: i.n, s: i.s | 0 }));
+  frameReady = true;
+  $("frameBtn").hidden = false;
+}
+
+function frameDoc(rev) {
+  return JSON.stringify({
+    v: 1, rev, interval: frame.interval, transition: frame.transition, look: frame.look,
+    order: frame.order, brightness: frame.brightness, items: frame.items.map(i => ({ n: i.n, s: i.s })),
+  });
+}
+
+// One save at a time; a change made while one is on its way is sent straight after it
+let frameSaving = false, frameAgain = false;
+async function saveFrame() {
+  if (!frameReady) return;
+  if (frameSaving) { frameAgain = true; return; }
+  frameSaving = true;
+  const rev = frame.rev + 1;
+  try {
+    const r = await fetch(base + "api/frame", { method: "POST", headers: { "Content-Type": "application/json" }, body: frameDoc(rev) });
+    if (!r.ok || !(await r.json()).ok) throw new Error();
+    frame.rev = rev;
+    if (!frameAgain) toast("Saved. The frame picks it up within a minute while Phone mode is on.", 3200);
+  } catch (e) {
+    toast("Couldn't save to the camera");
+  }
+  frameSaving = false;
+  if (frameAgain) { frameAgain = false; saveFrame(); }
+}
+
+function addToFrame(names) {
+  const add = names.filter(n => !n.endsWith(".AVI") && !onFrame(n));
+  if (!add.length) return true;
+  if (frame.items.length + add.length > FRAME_MAX) {
+    toast(`The frame holds up to ${FRAME_MAX} photos. Take some off first.`, 3000);
+    return false;
+  }
+  add.forEach(n => {
+    const it = items.find(i => i.n === n);
+    frame.items.push({ n, s: it ? it.s : 0 });
+  });
+  frame.items.sort((a, b) => num(b.n) - num(a.n));   // newest first
+  saveFrame();
+  return true;
+}
+function removeFromFrame(names) {
+  const before = frame.items.length;
+  frame.items = frame.items.filter(i => !names.includes(i.n));
+  if (frame.items.length !== before) saveFrame();
+}
+
+function viewerFrameButton() {
+  const b = $("vFrame");
+  b.hidden = !frameReady;
+  b.textContent = onFrame(items[current].n) ? "On frame ✓" : "Add to frame";
+}
+$("vFrame").addEventListener("click", () => {
+  const n = items[current].n;
+  if (onFrame(n)) removeFromFrame([n]); else addToFrame([n]);
+  viewerFrameButton();
+});
+$("sendFrame").addEventListener("click", () => {
+  if (addToFrame([...picked])) { selecting = false; picked.clear(); render(); }
+});
+
+function renderFrameSheet() {
+  const onCard = new Set(items.map(i => i.n));
+  const here = frame.items.filter(i => onCard.has(i.n)).length;
+  const gone = frame.items.length - here;
+  $("fCount").textContent = here === 1 ? "1 photo on the frame (up to 300)" : `${here} photos on the frame (up to 300)`;
+  $("fOrphans").hidden = !gone;
+  $("fOrphanText").textContent = `${gone} more only on the frame, deleted from the camera.`;
+  $("fClear").disabled = !frame.items.length;
+  document.querySelectorAll("#frameSheet .seg").forEach(seg => {
+    const key = seg.dataset.key;
+    seg.textContent = "";
+    FRAME_OPTIONS[key].forEach(([value, label]) => {
+      const b = document.createElement("button");
+      b.textContent = label;
+      b.className = frame[key] === value ? "on" : "";
+      b.addEventListener("click", () => {
+        if (frame[key] === value) return;
+        frame[key] = value;
+        renderFrameSheet();
+        saveFrame();
+      });
+      seg.appendChild(b);
+    });
+  });
+}
+$("frameBtn").addEventListener("click", () => { renderFrameSheet(); $("frameSheet").hidden = false; });
+$("fDone").addEventListener("click", () => { $("frameSheet").hidden = true; render(); });
+$("fOrphansOff").addEventListener("click", () => {
+  const onCard = new Set(items.map(i => i.n));
+  removeFromFrame(frame.items.filter(i => !onCard.has(i.n)).map(i => i.n));
+  renderFrameSheet();
+});
+$("fClear").addEventListener("click", () => {
+  $("frameSheet").hidden = true;
+  confirmSheet("Take all photos off the frame?", "They stay on the camera. The frame clears them at its next check.",
+    "Take off", () => { frame.items = []; saveFrame(); render(); });
 });
 
 load();

@@ -20,28 +20,12 @@ import time
 import zlib
 
 from link import Link
-from server import find_port
+from server import find_port, screen_png
 
 
 def png(path, w, h, rgb565_be, scale=3):
-    rows = []
-    for y in range(h):
-        row = bytearray()
-        for x in range(w):
-            hi, lo = rgb565_be[2 * (y * w + x)], rgb565_be[2 * (y * w + x) + 1]
-            v = hi << 8 | lo
-            px = bytes(((v >> 11) * 255 // 31, (v >> 5 & 63) * 255 // 63, (v & 31) * 255 // 31))
-            row += px * scale
-        rows += [b"\0" + bytes(row)] * scale
-
-    def chunk(kind, data):
-        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
-
     with open(path, "wb") as f:
-        f.write(b"\x89PNG\r\n\x1a\n")
-        f.write(chunk(b"IHDR", struct.pack(">IIBBBBB", w * scale, h * scale, 8, 2, 0, 0, 0)))
-        f.write(chunk(b"IDAT", zlib.compress(b"".join(rows), 6)))
-        f.write(chunk(b"IEND", b""))
+        f.write(screen_png(w, h, rgb565_be, scale))
 
 
 def main():

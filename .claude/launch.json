@@ -1,0 +1,55 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "digicam-sim",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd host && .venv/bin/python server.py --no-browser"
+      ],
+      "port": 8765,
+      "url": "http://127.0.0.1:8765"
+    },
+    {
+      "name": "digicam-sim-8767",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd host && .venv/bin/python server.py --no-browser --http 8767"
+      ],
+      "port": 8767,
+      "url": "http://127.0.0.1:8767"
+    },
+    {
+      "name": "digicam-guide",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd guide && python3 -m http.server 8766 --bind 127.0.0.1"
+      ],
+      "port": 8766,
+      "url": "http://127.0.0.1:8766"
+    },
+    {
+      "name": "digicam-design",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd design && python3 -m http.server 8768 --bind 127.0.0.1"
+      ],
+      "port": 8768,
+      "url": "http://127.0.0.1:8768"
+    },
+    {
+      "name": "digicam-guide-v3",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd guide-v3 && python3 -m http.server 8769 --bind 127.0.0.1"
+      ],
+      "port": 8769,
+      "url": "http://127.0.0.1:8769"
+    }
+  ]
+}

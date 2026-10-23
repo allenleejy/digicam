@@ -14,9 +14,11 @@ import mimetypes
 import os
 import re
 import shutil
+import struct
 import threading
 import time
 import webbrowser
+import zlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -30,6 +32,26 @@ NAME_RE = re.compile(r"^(DSC|MOV)_\d{4}\.(JPG|AVI)$")
 
 # Slow commands get longer replies; everything else answers within a second.
 TIMEOUTS = {"photo": 15.0, "rec_stop": 30.0, "rec_start": 10.0, "mode": 10.0, "list": 10.0}
+
+
+def screen_png(w, h, rgb565_be, scale=1):
+    """The camera's screen (RGB565, big-endian) as PNG bytes."""
+    rows = []
+    for y in range(h):
+        row = bytearray()
+        for x in range(w):
+            v = rgb565_be[2 * (y * w + x)] << 8 | rgb565_be[2 * (y * w + x) + 1]
+            row += bytes(((v >> 11) * 255 // 31, (v >> 5 & 63) * 255 // 63, (v & 31) * 255 // 31)) * scale
+        rows += [b"\0" + bytes(row)] * scale
+
+    def chunk(kind, data):
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w * scale, h * scale, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(b"".join(rows), 6)) + chunk(b"IEND", b""))
+
+
+FRAME = {"doc": None}   # the phone page's frame mailbox, for trying the page on the laptop
 
 
 class Bridge:
@@ -48,7 +70,15 @@ class Bridge:
         threading.Thread(target=self._connect_loop, daemon=True).start()
 
     def _connect_loop(self):
-        while self.hello is None:
+        while True:
+            if self.hello is not None:
+                time.sleep(0.5)
+                if self.link.reopened:          # the board was unplugged and is back
+                    self.link.reopened = False
+                    self.port = self.link.port_name
+                    self.hello = None
+                    print("board reconnected")
+                continue
             try:
                 if self.link is None:
                     found = self.fixed_port or find_port()
@@ -161,6 +191,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self._static(url.path[len("/static/"):])
             if url.path == "/api/state":
                 return self._send(200, b.state(int(q.get("log", [0])[0]), int(q.get("event", [0])[0])))
+            if url.path == "/api/lcd.png":
+                # what's on the camera's own screen right now (menus, QR codes), for the mirror
+                reply, chunks = b.link._request("shot", 5.0, True, {})
+                if not reply.get("ok"):
+                    return self._send(503, {"ok": False})
+                data = b"".join(chunks[k] for k in sorted(chunks))
+                return self._send(200, screen_png(reply["w"], reply["h"], data), "image/png",
+                                  {"Cache-Control": "no-store"})
             if url.path == "/stream.mjpg":
                 return self._stream()
             # The phone page (firmware/web/phone.html), served here the way the camera serves
@@ -168,6 +206,11 @@ class Handler(BaseHTTPRequestHandler):
             if url.path == "/phone/":
                 with open(PHONE_PAGE, "rb") as f:
                     return self._send(200, f.read(), "text/html; charset=utf-8")
+            if url.path == "/phone/api/frame":
+                # the frame mailbox, kept in memory here (the camera keeps it in /sdcard/frame.json)
+                if FRAME["doc"] is None:
+                    return self._send(204, b"")
+                return self._send(200, FRAME["doc"])
             if url.path == "/phone/api/list":
                 r = b.command({"cmd": "list"})
                 st = (b.link.status if b.link else {}) or {}
@@ -192,6 +235,20 @@ class Handler(BaseHTTPRequestHandler):
             self._send(503, {"ok": False, "error": str(e)})
 
     def do_POST(self):
+        if self.path == "/phone/api/frame":
+            n = int(self.headers.get("Content-Length", 0))
+            if n > 16 * 1024:
+                self.close_connection = True
+                return self._send(413, {"ok": False})
+            body = self.rfile.read(n)
+            try:
+                ok = isinstance(json.loads(body), dict)
+            except ValueError:
+                ok = False
+            if not ok:
+                return self._send(400, {"ok": False})
+            FRAME["doc"] = body
+            return self._send(200, {"ok": True})
         if self.path == "/phone/api/delete":
             name = self.rfile.read(int(self.headers.get("Content-Length", 0))).decode().strip()
             if not NAME_RE.match(name):

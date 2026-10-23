@@ -1,6 +1,160 @@
-# Camera 1 case design: InstantSnap-style, clear sandwich
+# Camera 1 case design
 
-## v2 test-fit body (10 Oct 2026): print this one
+## v3 bodies (23 Oct 2026): print one of these
+
+**Built for the parts as they arrived on 23 Oct.**
+
+- **Files:**
+  - model: `cad/camera1_v3.scad`;
+  - print files: `cad/export/v3/clear/` and `cad/export/v3/retro/`;
+  - renders: `cad/renders/v3/`.
+- **Rebuilding:** `python3 cad/export_v3.py` re-exports everything and runs `cad/check_v3.py`. That checks 196 pairs of parts in both styles, and none overlap.
+- **History:** v2 (below) was built for the 1.14 in screen and the extension ribbon, and no longer fits.
+
+| | Clear | Retro |
+| --- | --- | --- |
+| Look | InstantSnap Novo-like (restyled 23 Oct from your reference picture): a frosted tinted shell with a chamfered rim standing 0.9 mm proud of both faces, a raised bezel round the screen and buttons, a separate panel over the battery, an orange pill shutter and the power switch on the top left, a strap loop on the left side | Rangefinder: textured covering front and back, a separate top plate with shutter, dial and accessory shoe, a knurled lens barrel, strap lugs |
+| Size | 112 × 68 × 22.3 mm with the rim (20.5 mm plates) | 112 × 68.2 × 20.9 mm (lens barrel adds 6 mm, lugs 3 mm each side) |
+| Parts to print | 9 | 12 |
+
+**Step-by-step assembly, wiring diagrams and wire lengths: `11-assembly-guide-v3.md`.**
+
+![Clear](cad/renders/v3/clear_back.png)
+![Retro](cad/renders/v3/retro_front.png)
+
+### What changed, and why
+
+- **2.0 in screen.** The 58 × 35 mm module sits behind the board, in a lip on the back plate that locates its glass. A thin foam pad between the screen and the sled clamps it when the case closes, so it needs no screws. The corner screw posts moved into free strips around the screen.
+- **No camera extension.** The camera folds back onto the board's ESP32 module, so the board decides where the lens is.
+  - A square collar on the inside of the front plate centres the lens holder and holds it down as the plate goes on.
+  - Stick the camera to the module with a small square of 0.4 mm foam tape first.
+  - The camera-on-module stack sets the thickness at about 20.5 mm, up from 15 mm.
+- **Buttons with real seats:**
+  - Each switch drops into its own pocket in a **button carrier**, a small printed tray with slots for its feet and wires. The carrier screws to two posts on the back plate.
+  - Each cap runs in its own **guide sleeve**, so it can't wobble, and sits in its own **recessed dish** on the back, so the three are clearly separate.
+  - The ◀ and ▶ caps carry arrows and are keyed so they can't turn. ● has a dot.
+  - The shutter switch sits in a cradle under the top wall (clear), or in a socket under the top plate (retro).
+- **Charge module** in front of the battery, against the left wall (seen from the back). Its USB-C comes out of the camera's right side seen from the front. A rim on the front plate holds it.
+  - Clear: its LEDs show through the clear front.
+  - Retro: a 2 mm peep hole in the front plate.
+- **Battery** in its bay, with a lead gap at the top right. The left strip beside it is a wire lane for the battery leads and the switch wires.
+- **Shutter and slide switch:**
+  - Clear: both on the top left (seen from the back), above the battery. The shutter is an orange pill.
+  - Retro: both in the top plate; the shutter on the right, the switch on the left.
+  - Both bodies put a printed cap on the slide switch's knob, glued on with CA: the bare knob doesn't reach the outside.
+- **Board USB-C** on the right side seen from the back (the left side seen from the front), as before.
+
+### Parts, how to print them, and colour ideas
+
+Everything prints flat without supports at 0.2 mm layers with 3 walls. The STLs are already in the right orientation.
+
+| Part | File | Print | Clear: colour | Retro: colour |
+| --- | --- | --- | --- | --- |
+| Frame (the sides) | `frame.stl` | Standing on its back edge | Translucent mint PETG | Black |
+| Back plate | `back_plate.stl` | Outside face down | Translucent mint or clear PETG | Black |
+| Front plate | `front_plate.stl` | Outside face down | Translucent mint or clear PETG | Black |
+| Sled (board and screen stack) | `sled.stl` | Flat | Any; it shows through, so a colour | Any |
+| Button carrier | `carrier.stl` | Floor down | Accent colour | Any |
+| Caps: ◀ ● ▶, the shutter, the switch cap | `caps.stl` | As exported | Orange; switch cap grey | Silver or cream; switch cap black |
+| Lens ring (clear) | `lens_ring.stl` | Flat | Accent | |
+| Battery panel (clear) | `panel.stl` | Flat | Frosted white or mint | |
+| Screen bezel (clear) | `bezel.stl` | Flat, outer face up | Frosted white or mint | |
+| Top plate (retro) | `top_plate.stl` | Upside down, top on the bed | | Silver or cream |
+| Dial, accessory shoe, shutter collar | `top_bits.stl` | As exported | | Black |
+| Lens barrel | `lens_barrel.stl` | Back face down | | Silver |
+| Front covering | `leatherette.stl` | Flat, grain up | | Brown or tan |
+| Back covering | `back_leatherette.stl` | Flat, grain up | | Same as the front |
+| Window inserts (viewfinder, rangefinder, eyepiece) | `window_inserts.stl` | Flat | | Black or dark grey |
+
+**Glass-clear plates:** for the clear style, the plates can instead be laser-cut from 2 mm acrylic using `clear/*_lasercut.dxf`. They then lose the button sleeves, the carrier posts, the screen lip, the camera collar and the charger rim, so use the printed plates for the first build.
+
+**Retro coverings:** they go on with thin double-sided tape. They cut around the barrel and the screw heads, so the camera can still be opened.
+
+### Hardware
+
+| Item | Clear | Retro |
+| --- | --- | --- |
+| M2 heat-set inserts (3.5 mm OD) | 11 (8 in the frame's corner posts, 3 in the sled blocks) | 16 (+2 under the top wall for the top plate, +3 in the lens barrel) |
+| M2 × 5 button head | 8 (plates) + 4 (board to sled) | 8 + 4, + 3 (barrel, from inside the front plate) |
+| M2 × 4 | 3 (sled to frame) | 3 |
+| M2 × 6, or × 5 | 2 (button carrier to the back plate's posts) | 2 |
+| M2 × 14 countersunk (flat head) | | 2 (top plate, from the top: visible, as on old cameras). Not in your kit; M2 × 12 will also do |
+| Foam tape | Battery to back plate, camera to module (0.4 mm), screen to sled (0.5 mm) | Same |
+
+### Assembly order
+
+1. **Inserts:** heat-set them into the frame's posts (both faces) and sled blocks. For retro, also the two bosses under the top wall and the barrel.
+2. **Solder and test on the desk first** (`05-bench-bring-up.md`):
+   - the four buttons, on two diagonal feet each;
+   - the slide switch;
+   - the screen's 8 wires;
+   - the battery to the charge module (below);
+   - the module's OUT through the switch to the board's 5V.
+3. **Board onto the sled** with 4 screws. Fold the camera onto the ESP32 module, lens facing away from the board, on a square of foam tape.
+4. **Back plate:**
+   - drop the caps into their sleeves from the inside, with the ◀ ▶ keys in their slots;
+   - put the switches into the carrier's pockets, plungers toward the caps, wires out through the slots;
+   - screw the carrier onto its two posts;
+   - lay the screen in its lip, glass down, with the foam pad on its back.
+5. **Frame onto the back plate**, with 4 screws from the back.
+6. **Inside:**
+   1. Battery (foam tape) into its bay.
+   2. Charge module on its front, USB-C to the side wall.
+   3. Shutter switch into its cradle or socket, and slide switch into its pocket.
+   4. Feed the screen wires through the sled's slots.
+   5. Lower the sled stack onto its three blocks and screw it down.
+7. **Retro:** the top plate goes on with 2 screws from the top. Then screw the barrel on from inside the front plate, before the plate goes on.
+8. **Front plate:**
+   - Check the lens lines up with the hole: the collar slides over the camera as the plate goes on.
+   - Fit 4 screws.
+   - Clear: glue on the lens ring. Retro: tape on the coverings.
+
+### Wiring changes from the plan
+
+- **Battery plug:**
+  - The pigtail you bought has the same male plug as the battery, so the two can't mate. Cut the battery's plug off and solder its leads straight to the charge module's B+ and B−. That's the normal way.
+  - **Cut one lead at a time**, and cover the cut end with tape before cutting the other, so the two never touch. A shorted LiPo gets hot fast, even a protected one.
+  - Strip 2 mm, tin, slide heat-shrink on first, and solder red to B+.
+  - Check polarity with the meter before the module's OUT goes anywhere.
+- **Camera:**
+  - It plugs straight into the board, so there's no ribbon to route.
+  - The folded ribbon has to bend 180°: keep the bend gentle and don't crease it.
+  - The camera now sits on the warm ESP32 module. The foam tape insulates it a little. If photos get noisy after long use, a thin pad of Kapton under the camera helps.
+
+### Measure these before printing
+
+The model uses these values. Most are estimates, marked `MEASURE` in the file. Send the numbers and I'll update the model, re-export and re-run the fit check.
+
+1. **2.0 in screen module:**
+   - outer size (58 × 35 assumed);
+   - thickness from the glass face to the back with the pins cut (4.0);
+   - where the visible picture area sits, from the module's bottom-left corner with the glass facing you (8.6, 2.2 assumed: centred);
+   - the hole positions.
+2. **Camera on the board,** seen from the back of the camera (the board's underside facing you):
+   - the lens centre from the board's left end (14.0) and from its bottom edge (14.05);
+   - the height of the lens front above the board (8.7 assumed: 3.3 module + 0.4 tape + 5.5 camera);
+   - the length of the round part of the lens (2.0).
+3. **Board:**
+   - where the USB-C socket(s) are along its end (14.0 from the bottom edge). If both sockets are on that end, give both;
+   - the tallest part on the underside (2.0, the microSD socket).
+4. **Slide switch:** body and knob size (8.6 × 3.6 × 3.6, knob 2.0 × 1.5).
+5. **Charge module:** height of its USB-C socket's centre above the module's back (2.6).
+
+**Quick test print first:**
+1. Print the back plate, carrier and caps, about 1.5 h. That checks button feel and the screen window against the real screen.
+2. Print the front plate, about 40 min. Hold it against the board stack to see the lens line up.
+3. Then print the rest.
+
+### Firmware
+
+**The firmware still drives the 1.14 in screen (240 × 135).** The 2.0 in screen needs these changes in `display.c` and the drawing code:
+- 320 × 240;
+- its own orientation and offset;
+- the menus laid out for the bigger screen.
+
+The simulator already renders every screen, so the layouts can be checked on the laptop.
+
+## v2 test-fit body (10 Oct 2026)
 
 **Built around the parts as you measured them, with the 1.14 in screen.** Model: `cad/camera1_v2.scad`. Printable files: `cad/export/v2/`. Renders: `cad/renders/v2/`. `cad/check_v2.py` checks every pair of parts for overlaps (75 pairs, none overlap).
 

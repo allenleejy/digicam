@@ -5,6 +5,7 @@
  *   DCIM/DSC_0001.JPG          photos, full resolution
  *   DCIM/MOV_0002.AVI          videos, MJPEG
  *   DCIM/.thumbs/DSC_0001.JPG  preview-size thumbnail for each photo/video
+ *   frame.json                 the frame mailbox (outside DCIM)
  *
  * The file number is found by scanning the card at boot, so swapping cards
  * never overwrites a photo.
@@ -31,6 +32,9 @@ static const char *TAG = "storage";
 
 #define PHOTO_TMP  STORAGE_DCIM "/.photo.tmp"
 #define VIDEO_TMP  STORAGE_DCIM "/.rec.tmp"
+#define FRAME_PATH STORAGE_ROOT "/frame.json"
+#define FRAME_TMP  STORAGE_ROOT "/frame.tmp"
+#define FRAME_OLD  STORAGE_ROOT "/frame.old"
 
 #define BOUNCE_SIZE (16 * 1024)
 
@@ -99,6 +103,11 @@ esp_err_t storage_init(void)
     mkdir(STORAGE_THUMBS, 0775);
     unlink(PHOTO_TMP);
     unlink(VIDEO_TMP);
+    /* A mailbox save cut off after the old one was moved aside: put the old one back */
+    struct stat fst;
+    if (stat(FRAME_PATH, &fst) != 0 && stat(FRAME_OLD, &fst) == 0) rename(FRAME_OLD, FRAME_PATH);
+    unlink(FRAME_OLD);
+    unlink(FRAME_TMP);
 
     int max = 0;
     DIR *d = opendir(STORAGE_DCIM);
@@ -300,6 +309,39 @@ esp_err_t storage_delete(const char *name)
     if (unlink(path) != 0) return ESP_ERR_NOT_FOUND;
     thumb_path(name, path, sizeof(path));
     unlink(path);
+    return ESP_OK;
+}
+
+FILE *storage_frame_open(uint32_t *size)
+{
+    struct stat st;
+    if (!s_ready || stat(FRAME_PATH, &st) != 0) return NULL;
+    *size = (uint32_t)st.st_size;
+    return fopen(FRAME_PATH, "rb");
+}
+
+esp_err_t storage_frame_save(const void *buf, size_t len)
+{
+    if (!s_ready) return ESP_ERR_INVALID_STATE;
+    FILE *f = fopen(FRAME_TMP, "wb");
+    if (!f) return ESP_FAIL;
+    bool ok = fwrite(buf, 1, len, f) == len && fflush(f) == 0 && fsync(fileno(f)) == 0;
+    fclose(f);
+    if (!ok) {
+        unlink(FRAME_TMP);
+        return ESP_FAIL;
+    }
+    /* FAT can't rename over a file, so the old mailbox moves aside first. A power cut at
+     * any point leaves a whole document: storage_init puts the old one back if needed. */
+    unlink(FRAME_OLD);
+    rename(FRAME_PATH, FRAME_OLD);                  /* fails harmlessly the first time */
+    if (rename(FRAME_TMP, FRAME_PATH) != 0) {
+        ESP_LOGE(TAG, "rename to %s failed: %s", FRAME_PATH, strerror(errno));
+        rename(FRAME_OLD, FRAME_PATH);
+        unlink(FRAME_TMP);
+        return ESP_FAIL;
+    }
+    unlink(FRAME_OLD);
     return ESP_OK;
 }
 

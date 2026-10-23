@@ -6,6 +6,8 @@
  *   GET  /thumb/NAME       320x240 preview JPEG
  *   GET  /file/NAME        the photo or video
  *   POST /api/delete       body: NAME
+ *   GET  /api/frame        the frame mailbox, as stored (204 when there's none)
+ *   POST /api/frame        body: the whole mailbox document, at most 16 KB
  *
  * All camera and SD work otherwise happens on cam_task; in Phone mode the camera is
  * idle, so the web server's task is the only one reading the card.
@@ -24,15 +26,22 @@
 #include "esp_http_server.h"
 #include "esp_log.h"
 #include "esp_netif.h"
+#include "esp_timer.h"
 #include "esp_wifi.h"
+#include "cJSON.h"
 
 static const char *TAG = "phone";
 
 extern const char phone_html_start[] asm("_binary_phone_html_start");
 extern const char phone_html_end[] asm("_binary_phone_html_end");
 
+/* Reads go into internal RAM: the SD driver can't DMA into PSRAM and falls back to one
+ * 512-byte sector per transfer. The web server runs handlers one at a time on its own
+ * task, so one buffer is enough. */
 #define CHUNK (16 * 1024)
+#define FRAME_MAX CHUNK    /* the mailbox fits the read buffer, so it's received and sent in one piece */
 
+static uint8_t *s_chunk;
 static bool s_inited, s_running;
 static httpd_handle_t s_http;
 static volatile int s_clients;
@@ -95,17 +104,22 @@ static esp_err_t send_file(httpd_req_t *req, bool thumb)
     httpd_resp_set_type(req, thumb || !video ? "image/jpeg" : "video/x-msvideo");
     /* names are never reused (numbers keep counting), so the phone may keep copies */
     httpd_resp_set_hdr(req, "Cache-Control", "max-age=31536000, immutable");
-    char *chunk = heap_caps_malloc(CHUNK, MALLOC_CAP_SPIRAM);
-    esp_err_t err = chunk ? ESP_OK : ESP_ERR_NO_MEM;
+    int64_t t0 = esp_timer_get_time();
+    esp_err_t err = ESP_OK;
     size_t n;
-    while (err == ESP_OK && (n = fread(chunk, 1, CHUNK, f)) > 0) err = httpd_resp_send_chunk(req, chunk, n);
+    while (err == ESP_OK && (n = fread(s_chunk, 1, CHUNK, f)) > 0) err = httpd_resp_send_chunk(req, (const char *)s_chunk, n);
     fclose(f);
-    free(chunk);
     if (err == ESP_OK) err = httpd_resp_send_chunk(req, NULL, 0);
-    if (err == ESP_OK && !thumb && s_activity) {
-        char msg[32];
-        snprintf(msg, sizeof(msg), "sent %.8s", name);
-        s_activity(msg, false);
+    if (err == ESP_OK && !thumb) {
+        /* time from first read to last byte handed to Wi-Fi: card and Wi-Fi together */
+        float s = (esp_timer_get_time() - t0) / 1e6f;
+        ESP_LOGI(TAG, "sent %s: %lu KB in %.2f s (%.0f KB/s)", name, (unsigned long)(size >> 10), s,
+                 s > 0 ? size / 1024.0f / s : 0);
+        if (s_activity) {
+            char msg[32];
+            snprintf(msg, sizeof(msg), "sent %.8s", name);
+            s_activity(msg, false);
+        }
     }
     return err;
 }
@@ -129,6 +143,58 @@ static esp_err_t del(httpd_req_t *req)
     return httpd_resp_sendstr(req, ok ? "{\"ok\":true}" : "{\"ok\":false}");
 }
 
+/* ---------------------------------------------------------------- frame mailbox */
+
+static bool from_frame(httpd_req_t *req)
+{
+    char ua[16] = "";
+    httpd_req_get_hdr_value_str(req, "User-Agent", ua, sizeof(ua));   /* truncated is fine */
+    return strncmp(ua, "DigiGallery/", 12) == 0;
+}
+
+static esp_err_t frame_get(httpd_req_t *req)
+{
+    if (from_frame(req) && s_activity) s_activity("frame here", false);
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    uint32_t size = 0;
+    FILE *f = storage_frame_open(&size);
+    if (!f) {
+        httpd_resp_set_status(req, "204 No Content");
+        return httpd_resp_send(req, NULL, 0);
+    }
+    size_t n = fread(s_chunk, 1, CHUNK, f);
+    fclose(f);
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_send(req, (const char *)s_chunk, n);
+}
+
+static esp_err_t frame_post(httpd_req_t *req)
+{
+    if (req->content_len > FRAME_MAX) {
+        httpd_resp_send_err(req, HTTPD_413_CONTENT_TOO_LARGE, "The frame document is limited to 16 KB");
+        return ESP_FAIL;    /* closes the connection rather than reading the rest */
+    }
+    size_t got = 0;
+    while (got < req->content_len) {
+        int r = httpd_req_recv(req, (char *)s_chunk + got, req->content_len - got);
+        if (r == HTTPD_SOCK_ERR_TIMEOUT) continue;
+        if (r <= 0) return ESP_FAIL;
+        got += r;
+    }
+    cJSON *doc = cJSON_ParseWithLength((const char *)s_chunk, got);
+    bool ok = cJSON_IsObject(doc);
+    cJSON_Delete(doc);
+    if (!ok) return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Not a JSON object");
+    if (storage_frame_save(s_chunk, got) != ESP_OK) return httpd_resp_send_500(req);
+    ESP_LOGI(TAG, "frame mailbox saved: %u bytes, internal free %u KB", (unsigned)got,
+             (unsigned)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) >> 10));
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_sendstr(req, "{\"ok\":true}");
+}
+
+/* cJSON's nodes for a 300-photo mailbox take about 50 KB: keep them out of internal RAM */
+static void *json_malloc(size_t n) { return heap_caps_malloc(n, MALLOC_CAP_SPIRAM); }
+
 static esp_err_t start_http(void)
 {
     httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
@@ -136,6 +202,7 @@ static esp_err_t start_http(void)
     cfg.stack_size = 8192;
     cfg.max_open_sockets = 7;      /* Safari opens several connections for the thumbnails */
     cfg.lru_purge_enable = true;
+    cfg.max_uri_handlers = 12;     /* the default 8 leaves too little room */
     esp_err_t err = httpd_start(&s_http, &cfg);
     if (err != ESP_OK) return err;
     const httpd_uri_t uris[] = {
@@ -144,6 +211,8 @@ static esp_err_t start_http(void)
         { .uri = "/thumb/*",    .method = HTTP_GET,  .handler = thumb },
         { .uri = "/file/*",     .method = HTTP_GET,  .handler = file },
         { .uri = "/api/delete", .method = HTTP_POST, .handler = del },
+        { .uri = "/api/frame",  .method = HTTP_GET,  .handler = frame_get },
+        { .uri = "/api/frame",  .method = HTTP_POST, .handler = frame_post },
     };
     for (int i = 0; i < sizeof(uris) / sizeof(uris[0]); i++) httpd_register_uri_handler(s_http, &uris[i]);
     return ESP_OK;
@@ -154,6 +223,8 @@ static esp_err_t start_http(void)
 esp_err_t phone_start(const char *ssid, const char *pass, const char *owner)
 {
     if (s_running) return ESP_OK;
+    if (!s_chunk) s_chunk = heap_caps_malloc(CHUNK, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+    if (!s_chunk) return ESP_ERR_NO_MEM;
     snprintf(s_ssid, sizeof(s_ssid), "%s", ssid);
     snprintf(s_owner, sizeof(s_owner), "%s", owner);
     if (!s_inited) {
@@ -165,6 +236,9 @@ esp_err_t phone_start(const char *ssid, const char *pass, const char *owner)
         ESP_ERROR_CHECK(esp_wifi_init(&init));
         ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, on_wifi, NULL));
         ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
+        /* For every cJSON user, including the USB link's commands: free() handles both heaps */
+        cJSON_Hooks hooks = { .malloc_fn = json_malloc, .free_fn = free };
+        cJSON_InitHooks(&hooks);
         s_inited = true;
     }
     wifi_config_t ap = { 0 };
@@ -195,5 +269,7 @@ void phone_stop(void)
     esp_wifi_stop();
     s_clients = 0;
     s_running = false;
+    free(s_chunk);
+    s_chunk = NULL;
     ESP_LOGI(TAG, "Wi-Fi off");
 }

@@ -3,7 +3,8 @@
 /*
  * pins.h: GPIO map for the GOOUUU ESP32-S3-CAM Core N16R8.
  * Camera and microSD pins are fixed by the board. Taken from
- * lovebox/development/firmware/camera-test/main/pins.h.
+ * Love Letter Box firmware/camera-test/main/pins.h (now on the
+ * june-2026 branch of github.com/lovingdailyreminders/development).
  * Screen, buttons and battery sense follow ../02-build-plan.md (Pin plan).
  */
 
