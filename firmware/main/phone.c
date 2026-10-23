@@ -6,6 +6,7 @@
  *   GET  /api/list         {"camera","owner","battery","items":[{"n","s","v"}]} newest first
  *   GET  /thumb/NAME       320x240 preview JPEG
  *   GET  /file/NAME        the photo or video
+ *   GET  /small/NAME?w=&h= the photo made to fill w x h, for the DigiGallery frame
  *   POST /api/delete       body: NAME
  *   GET  /api/frame        the frame mailbox, as stored (204 when there's none)
  *   POST /api/frame        body: the whole mailbox document, at most 16 KB
@@ -16,6 +17,7 @@
 
 #include "phone.h"
 #include "battery.h"
+#include "small.h"
 #include "storage.h"
 
 #include <stdio.h>
@@ -122,14 +124,33 @@ static esp_err_t list(httpd_req_t *req)
     return err;
 }
 
+/* Send an open file in CHUNK pieces, and close it */
+static esp_err_t send_open_file(httpd_req_t *req, FILE *f)
+{
+    esp_err_t err = ESP_OK;
+    size_t n;
+    while (err == ESP_OK && (n = fread(s_chunk, 1, CHUNK, f)) > 0) err = httpd_resp_send_chunk(req, (const char *)s_chunk, n);
+    fclose(f);
+    heap_sample(NULL);
+    if (err == ESP_OK) err = httpd_resp_send_chunk(req, NULL, 0);
+    return err;
+}
+
+/* The NAME in /thumb/NAME, /file/NAME or /small/NAME, without any ?... */
+static bool uri_name(httpd_req_t *req, const char *prefix, char *name, size_t cap)
+{
+    const char *path = req->uri + strlen(prefix);
+    size_t len = strcspn(path, "?");                /* the page may add ?retry=1 */
+    if (len >= cap) return false;
+    memcpy(name, path, len);
+    name[len] = 0;
+    return true;
+}
+
 static esp_err_t send_file(httpd_req_t *req, bool thumb)
 {
     char name[STORAGE_NAME_LEN];
-    const char *path = req->uri + (thumb ? strlen("/thumb/") : strlen("/file/"));
-    size_t len = strcspn(path, "?");                /* the page may add ?retry=1 */
-    if (len >= sizeof(name)) return httpd_resp_send_404(req);
-    memcpy(name, path, len);
-    name[len] = 0;
+    if (!uri_name(req, thumb ? "/thumb/" : "/file/", name, sizeof(name))) return httpd_resp_send_404(req);
     uint32_t size = 0;
     FILE *f = storage_open(name, thumb, &size);   /* rejects any name that isn't ours */
     if (!f) return httpd_resp_send_404(req);
@@ -138,12 +159,7 @@ static esp_err_t send_file(httpd_req_t *req, bool thumb)
     /* names are never reused (numbers keep counting), so the phone may keep copies */
     httpd_resp_set_hdr(req, "Cache-Control", "max-age=31536000, immutable");
     int64_t t0 = esp_timer_get_time();
-    esp_err_t err = ESP_OK;
-    size_t n;
-    while (err == ESP_OK && (n = fread(s_chunk, 1, CHUNK, f)) > 0) err = httpd_resp_send_chunk(req, (const char *)s_chunk, n);
-    fclose(f);
-    heap_sample(NULL);
-    if (err == ESP_OK) err = httpd_resp_send_chunk(req, NULL, 0);
+    esp_err_t err = send_open_file(req, f);
     if (err == ESP_OK && !thumb) {
         /* time from first read to last byte handed to Wi-Fi: card and Wi-Fi together */
         float s = (esp_timer_get_time() - t0) / 1e6f;
@@ -160,6 +176,60 @@ static esp_err_t send_file(httpd_req_t *req, bool thumb)
 
 static esp_err_t thumb(httpd_req_t *req) { return send_file(req, true); }
 static esp_err_t file(httpd_req_t *req) { return send_file(req, false); }
+
+static int query_int(const char *q, const char *key)
+{
+    char v[8];
+    return httpd_query_key_value(q, key, v, sizeof(v)) == ESP_OK ? atoi(v) : 0;
+}
+
+/* GET /small/NAME?w=W&h=H: the real photo, scaled to cover W x H with the middle cropped,
+ * for the frame (10-frame-mailbox.md). Made the first time, about a second, and kept on
+ * the card for next time. Photos only. */
+static esp_err_t small(httpd_req_t *req)
+{
+    char name[STORAGE_NAME_LEN], q[32] = "";
+    uint32_t size = 0;
+    if (!uri_name(req, "/small/", name, sizeof(name)) || strncmp(name, "DSC_", 4) != 0) return httpd_resp_send_404(req);
+    httpd_req_get_url_query_str(req, q, sizeof(q));
+    int w = query_int(q, "w"), h = query_int(q, "h");
+    FILE *f = storage_open(name, false, &size);   /* checks the name: 404 for anything not ours */
+    if (!f) return httpd_resp_send_404(req);
+    if (w < 16 || w > 640 || h < 16 || h > 640) {
+        fclose(f);
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "w and h must each be 16 to 640");
+    }
+    httpd_resp_set_type(req, "image/jpeg");
+    httpd_resp_set_hdr(req, "Cache-Control", "max-age=31536000, immutable");
+
+    uint32_t kept_size;
+    FILE *kept = storage_small_open(name, w, h, &kept_size);
+    if (kept) {
+        fclose(f);
+        return send_open_file(req, kept);
+    }
+
+    /* Not made yet: read the photo into PSRAM, through the internal buffer (the SD driver
+     * can't DMA into PSRAM) */
+    uint8_t *photo = heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
+    size_t got = 0, n;
+    while (photo && got < size && (n = fread(s_chunk, 1, size - got < CHUNK ? size - got : CHUNK, f)) > 0) {
+        memcpy(photo + got, s_chunk, n);
+        got += n;
+    }
+    fclose(f);
+    uint8_t *jpg = NULL;
+    size_t jpg_len = 0;
+    esp_err_t err = !photo ? ESP_ERR_NO_MEM : got != size ? ESP_FAIL : small_make(photo, size, w, h, &jpg, &jpg_len);
+    free(photo);
+    heap_sample("GET /small");
+    if (err != ESP_OK) return httpd_resp_send_500(req);
+    if (storage_small_save(name, w, h, jpg, jpg_len) != ESP_OK)
+        ESP_LOGW(TAG, "%s: small copy not kept", name);   /* still send it */
+    err = httpd_resp_send(req, (const char *)jpg, jpg_len);
+    free(jpg);
+    return err;
+}
 
 static esp_err_t del(httpd_req_t *req)
 {
@@ -250,6 +320,7 @@ static esp_err_t start_http(void)
         { .uri = "/apple-touch-icon-precomposed.png", .method = HTTP_GET, .handler = app_icon },
         { .uri = "/thumb/*",    .method = HTTP_GET,  .handler = thumb },
         { .uri = "/file/*",     .method = HTTP_GET,  .handler = file },
+        { .uri = "/small/*",    .method = HTTP_GET,  .handler = small },
         { .uri = "/api/delete", .method = HTTP_POST, .handler = del },
         { .uri = "/api/frame",  .method = HTTP_GET,  .handler = frame_get },
         { .uri = "/api/frame",  .method = HTTP_POST, .handler = frame_post },

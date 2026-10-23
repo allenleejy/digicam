@@ -1,0 +1,6 @@
+# jpge's tables (8 KB, used only while /small encodes) go to PSRAM; see sdkconfig.defaults
+[mapping:jpge_extram]
+archive: libespressif__esp32-camera.a
+entries:
+    jpge (extram_bss)
+    to_jpg (extram_bss)

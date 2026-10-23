@@ -52,3 +52,9 @@ CONFIG_LWIP_TCP_SND_BUF_DEFAULT=11488
 CONFIG_LWIP_TCP_WND_DEFAULT=16384
 CONFIG_LWIP_TCP_RECVMBOX_SIZE=32
 CONFIG_LWIP_TCPIP_RECVMBOX_SIZE=64
+
+# /small (0.4.1) re-encodes photos with esp32-camera's jpge, whose tables (8 KB) are static:
+# kept in internal RAM they took Phone mode down to 25-29 KB free. This lets fixed
+# variables live in PSRAM: jpge's, by main/linker.lf, and those of lwIP and the Wi-Fi
+# libraries, which ESP-IDF moves on its own when this is on.
+CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y

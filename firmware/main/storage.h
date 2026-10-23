@@ -9,6 +9,7 @@
 #define STORAGE_ROOT      "/sdcard"
 #define STORAGE_DCIM      STORAGE_ROOT "/DCIM"
 #define STORAGE_THUMBS    STORAGE_DCIM "/.thumbs"
+#define STORAGE_SMALL     STORAGE_DCIM "/.small"
 #define STORAGE_NAME_LEN  16   /* "DSC_0001.JPG" + NUL, with room */
 
 typedef struct {
@@ -30,7 +31,8 @@ uint8_t *storage_media_buf(void);
 /* Erase the card (FAT, quick format). Photos and videos are gone afterwards. */
 esp_err_t storage_format(void);
 
-/* Claim the next file number. Photos and videos share one counter. */
+/* Claim the next file number. Photos and videos share one counter, kept in NVS as well as
+ * read off the card, so numbers carry on after a format and a restart. */
 int storage_next_number(void);
 
 /* Save a photo and its preview-size thumbnail. Writes to a temp file, then renames,
@@ -49,7 +51,13 @@ esp_err_t storage_list(storage_item_t **out, int *count);
 /* Open a photo/video (or its thumbnail) for reading. Rejects any name that is not
  * one of ours, so commands can't reach outside DCIM. */
 FILE *storage_open(const char *name, bool thumb, uint32_t *size);
-esp_err_t storage_delete(const char *name);
+esp_err_t storage_delete(const char *name);   /* also its thumbnail and small copies */
+
+/* A photo's small copy for the frame (GET /small): DCIM/.small/DSC_0001_320x256.JPG.
+ * Open: NULL when it hasn't been made yet, or the name isn't one of our photos. Save goes
+ * through a temp file, like photos; `jpg` may be in PSRAM. */
+FILE *storage_small_open(const char *name, int w, int h, uint32_t *size);
+esp_err_t storage_small_save(const char *name, int w, int h, const uint8_t *jpg, size_t len);
 
 /* fwrite for buffers in PSRAM (camera frames). The SD driver can't DMA from PSRAM and
  * falls back to one 512-byte sector per transfer (~120 KB/s), so this copies through

@@ -43,7 +43,7 @@
 
 static const char *TAG = "digicam";
 
-#define FW_VERSION      "0.4.0"
+#define FW_VERSION      "0.4.1"
 #define SLOT_SIZE       (256 * 1024)     /* one preview frame on its way to the laptop */
 #define THUMB_SIZE      (128 * 1024)
 #define PLAY_BUF_SIZE   (256 * 1024)     /* gallery: a thumbnail or one video frame */
