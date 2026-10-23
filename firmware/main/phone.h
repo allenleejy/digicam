@@ -20,6 +20,12 @@ esp_err_t phone_start(const char *ssid, const char *pass, const char *owner);
 void phone_stop(void);
 bool phone_running(void);
 
+/* Lowest internal free heap seen in Phone mode since it last started, in KB; -1 before then.
+ * Sampled by phone_tick() (call it about twice a second) and after every request, and
+ * logged every 10 s while anyone is joined. */
+int phone_heap_min_kb(void);
+void phone_tick(void);
+
 /* Phones joined to the camera's Wi-Fi right now */
 int phone_clients(void);
 

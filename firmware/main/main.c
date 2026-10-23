@@ -145,7 +145,7 @@ static void send_status(void)
              "\"view\":\"%s\",\"rec\":%d,\"rec_ms\":%lu,\"rec_frames\":%lu,\"rec_kb\":%lu,"
              "\"fps\":%.1f,\"tx_fps\":%.1f,\"sd\":%d,\"sd_total_mb\":%llu,\"sd_free_mb\":%llu,"
              "\"photos\":%d,\"videos\":%d,\"battery\":%s,\"battery_mv\":%d,\"psram_kb\":%u,"
-             "\"internal_kb\":%u,\"uptime_s\":%lld}",
+             "\"internal_kb\":%u,\"phone_min_kb\":%d,\"uptime_s\":%lld}",
              s_mode == MODE_PHOTO ? "photo" : "video", s_look, s_power, s_stream, s_cam_ok, s_lcd_ok,
              (const char *[]){ "preview", "mode", "gallery", "settings", "phone" }[s_view],
              s_rec != NULL, (unsigned long)rec_ms,
@@ -155,7 +155,7 @@ static void send_status(void)
              s_photos, s_videos, batt, battery_present() ? battery_mv() : 0,
              (unsigned)(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) >> 10),
              (unsigned)(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) >> 10),
-             esp_timer_get_time() / 1000000);
+             phone_heap_min_kb(), esp_timer_get_time() / 1000000);
     link_send_json('S', buf);
 }
 
@@ -310,6 +310,7 @@ static void rec_start(int id)
     if (!s_cam_ok || !s_power) { fail(id, "camera off"); return; }
     if (s_mode != MODE_VIDEO) { fail(id, "not in video mode"); return; }
     if (s_rec) { fail(id, "already recording"); return; }
+    if (phone_running()) { fail(id, "Phone mode is on"); return; }   /* they share a buffer */
     if (!storage_ready() || s_sd_free < REC_MIN_FREE) { fail(id, "SD card missing or full"); return; }
 
     s_rec = avi_open(storage_video_tmp_path(), 640, 480);
@@ -1094,6 +1095,7 @@ static void cam_task(void *arg)
             static int64_t t_phone;
             if (now - t_phone >= 500000) {
                 t_phone = now;
+                phone_tick();
                 int step = phone_clients() > 0 ? 2 : 1;
                 if (step != s_phone_step && (step == 2 || s_phone_step == 2)) phone_show(step);
                 ui_state_t *u = ui_lock();

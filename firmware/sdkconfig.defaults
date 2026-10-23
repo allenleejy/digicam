@@ -38,3 +38,17 @@ CONFIG_JD_USE_ROM=n
 CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
 CONFIG_HTTPD_MAX_REQ_HDR_LEN=2048
 CONFIG_HTTPD_MAX_URI_LEN=512
+
+# Phone mode throughput (23 Oct). The defaults allow 4 packets (5.7 KB) in flight per TCP
+# connection, which held transfers to 105-190 KB/s; this doubles it to 8 (11.5 KB).
+# With Wi-Fi in PSRAM the TX buffers must be the static kind, and they sit in internal RAM:
+# - What TCP queues must fit in them, or frames are dropped and resent: a 32 KB send buffer
+#   over the default 16 buffers took transfers down to 15 KB/s.
+# - Each one takes 1.6 KB of internal RAM: 32 of them left only 11 KB free in Phone mode
+#   (the frame contract asks for 20 KB or more).
+# So: the default 16 buffers, and a send buffer that fits them.
+CONFIG_ESP_WIFI_TX_BA_WIN=8
+CONFIG_LWIP_TCP_SND_BUF_DEFAULT=11488
+CONFIG_LWIP_TCP_WND_DEFAULT=16384
+CONFIG_LWIP_TCP_RECVMBOX_SIZE=32
+CONFIG_LWIP_TCPIP_RECVMBOX_SIZE=64

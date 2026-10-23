@@ -1,6 +1,12 @@
 # Phone page v2: design plan and home-screen app
 
-Status: **plan, 21 Oct 2026.** Nothing here is built yet, apart from the mockup and the assets in `design/phone-v2/`. The page that's live on the camera is still `firmware/web/phone.html` (v1, see `08-phone-app-plan.md`).
+Status: **built 23 Oct 2026** in firmware 0.4.0. The page is `firmware/web/phone.src.html`; `python3 firmware/web/build.py` puts the font and icons in and writes `phone.html`, which the firmware embeds. Not yet tried on an iPhone.
+
+Changes from the plan:
+- **Saving:** pressing and holding the full photo in the viewer is the main way to save. The grid's previews can't be saved at all, so every saved photo is full quality.
+- **The Shortcut:** optional, offered only for saving many at once.
+- **Loading:** the viewer shows the thumbnail at once and fades the full photo in over it, then fetches the photos either side. Thumbnails load three at a time and pause while a photo is open.
+- **Icon:** the Lens option.
 
 ![Mockup](design/phone-v2/mockup.png)
 

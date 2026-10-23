@@ -25,7 +25,7 @@ static const char *TAG = "avi";
 
 #define HDR_SIZE      AVI_HDR_SIZE        /* everything before the first frame chunk */
 #define MOVI_FOURCC   220                 /* file offset of 'movi'; idx1 offsets count from here */
-#define WRITE_BUF     (32 * 1024)
+#define WRITE_BUF     STORAGE_MEDIA_BUF
 
 typedef struct {
     uint32_t offset;
@@ -107,14 +107,14 @@ avi_writer_t *avi_open(const char *path, int width, int height)
     w->height = height;
     w->idx_cap = 4096;
     w->idx = heap_caps_malloc(w->idx_cap * sizeof(idx_entry_t), MALLOC_CAP_SPIRAM);
-    /* stdio buffer in internal RAM so flushes can DMA to the card */
-    w->buf = heap_caps_malloc(WRITE_BUF, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+    /* stdio buffer in internal RAM so flushes can DMA to the card: the one set aside at
+     * start-up, since after Phone mode a fresh 16-32 KB block often can't be found */
+    w->buf = (char *)storage_media_buf();
     w->f = fopen(path, "wb");
     if (!w->idx || !w->buf || !w->f) {
         ESP_LOGE(TAG, "open %s failed", path);
         if (w->f) fclose(w->f);
         free(w->idx);
-        free(w->buf);
         free(w);
         return NULL;
     }
@@ -197,7 +197,6 @@ esp_err_t avi_close(avi_writer_t *w, uint32_t duration_ms)
     ESP_LOGI(TAG, "closed: %lu frames, %.1f fps, %lu KB",
              (unsigned long)w->frames, fps_milli / 1000.0, (unsigned long)(riff_size >> 10));
     free(w->idx);
-    free(w->buf);
     free(w);
     return ret;
 }

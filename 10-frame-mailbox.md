@@ -7,9 +7,9 @@ How the phone page decides what **DigiGallery**, Allen's desk photo frame, shows
 
 | Item | Status (22 Oct 2026) |
 | --- | --- |
-| 1. `GET` and `POST /api/frame` | Built in firmware 0.4.0. Not yet flashed or tried over Wi-Fi |
+| 1. `GET` and `POST /api/frame` | In firmware 0.4.0, flashed 23 Oct. Not yet tried over Wi-Fi |
 | 2. The document (below) | Written by the phone page exactly as specified |
-| 3. Phone page: Frame pill and sheet, badges, viewer button, Send to frame | Built and tested on the laptop (`host/server.py` at `/phone/`). Not yet tried on an iPhone |
+| 3. Phone page: Frame pill and sheet, badges, viewer button, Send to frame | In the new-design page (23 Oct), tested on the laptop (`host/server.py` at `/phone/`). Not yet tried on an iPhone |
 | 4. `/small` (optional) | Not built: after the gift unless 1–3 are done and tested by 25 Oct |
 | 5. "frame here" on the camera's screen (optional) | Built: shown when a `DigiGallery/` client reads `/api/frame` |
 
@@ -139,7 +139,9 @@ Then:
 | | |
 | --- | --- |
 | Firmware version and items | 0.4.0: items 1, 2, 3 and 5 |
-| A `frame.json` the page wrote | (after the iPhone test: `curl -s http://192.168.4.1/api/frame`) |
-| Internal free heap after a `POST /api/frame` | (logged by the camera: "frame mailbox saved: ... internal free N KB") |
-| Contract changes | None from his section 2 |
+| A `frame.json` the page wrote | `{"v":1,"rev":5,"interval":5,"transition":"cut","look":"natural","order":"newest","brightness":100,"items":[{"n":"DSC_0010.JPG","s":144739},{"n":"DSC_0009.JPG","s":135898},{"n":"DSC_0008.JPG","s":123796},{"n":"DSC_0005.JPG","s":113512}]}` (from an iPhone, 23 Oct, read off the camera over USB) |
+| Internal free heap after a `POST /api/frame` | (camera log: "phone: heap after POST /api/frame: internal free N KB, largest block N KB, lowest N KB") |
+| Internal free heap in Phone mode, nobody joined | 38 KB, largest block 26 KB (0.4.0, 23 Oct) |
+| Internal free heap, iPhone and frame both joined | Lowest 34 KB, largest block 24 KB (23 Oct joint test, current build) |
+| Contract changes | None to section 2. The Wi-Fi channel is no longer fixed at 6: Phone mode picks the quietest of 1, 6 and 11 at start (the frame finds the camera by name on any channel) |
 | Wi-Fi name | `digicam-2b9d` now. Becomes `digicam-<name>` if `OWNER_NAME` is set in `personal.h`; the password stays the same |

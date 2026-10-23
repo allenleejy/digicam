@@ -206,6 +206,15 @@ class Handler(BaseHTTPRequestHandler):
             if url.path == "/phone/":
                 with open(PHONE_PAGE, "rb") as f:
                     return self._send(200, f.read(), "text/html; charset=utf-8")
+            if url.path == "/api/camera-frame":
+                # the camera's own frame.json (what the phone page saved over Wi-Fi), read over USB
+                try:
+                    return self._send(200, b.link.get_file("frame.json"))
+                except DeviceError:
+                    return self._send(204, b"")
+            if url.path in ("/phone/icon-180.png", "/phone/apple-touch-icon.png"):
+                with open(os.path.join(HERE, "..", "firmware", "web", "icon-180.png"), "rb") as f:
+                    return self._send(200, f.read(), "image/png")
             if url.path == "/phone/api/frame":
                 # the frame mailbox, kept in memory here (the camera keeps it in /sdcard/frame.json)
                 if FRAME["doc"] is None:

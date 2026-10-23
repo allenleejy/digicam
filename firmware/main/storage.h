@@ -21,6 +21,12 @@ typedef struct {
 esp_err_t storage_init(void);
 bool storage_ready(void);
 
+/* One 16 KB internal-RAM buffer, set aside at start-up and shared by video recording (its
+ * write buffer) and Phone mode (its read buffer), which never run at the same time. Taken
+ * at start-up because once Wi-Fi has run, internal RAM is too broken up for a fresh one. */
+#define STORAGE_MEDIA_BUF (16 * 1024)
+uint8_t *storage_media_buf(void);
+
 /* Erase the card (FAT, quick format). Photos and videos are gone afterwards. */
 esp_err_t storage_format(void);
 

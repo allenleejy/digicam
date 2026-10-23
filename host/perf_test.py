@@ -16,6 +16,7 @@ import io
 import json
 import struct
 import time
+import urllib.error
 import urllib.request
 
 try:
@@ -35,12 +36,19 @@ def state(base):
         return json.load(r)
 
 
-def media(base, name, thumb=False):
+def media(base, name, thumb=False, tries=4):
+    """A file over USB. The link drops data now and then; the simulator resumes, and this
+    tries again if it gives up."""
     url = f"{base}/api/media/{name}" + ("?thumb=1" if thumb else "")
     t0 = time.time()
-    with urllib.request.urlopen(url, timeout=600) as r:
-        data = r.read()
-    return data, time.time() - t0
+    for k in range(tries):
+        try:
+            with urllib.request.urlopen(url, timeout=600) as r:
+                return r.read(), time.time() - t0
+        except urllib.error.HTTPError:
+            if k == tries - 1:
+                raise
+            time.sleep(2)
 
 
 def jpeg_problem(data, decode=True):
@@ -99,6 +107,8 @@ def main():
     base = a.base.rstrip("/")
     report = {"firmware": None, "photos": [], "video": None, "files": [], "problems": []}
 
+    call(base, {"cmd": "stream", "on": True})       # a run cut short may have left it off
+    time.sleep(2)
     st = state(base)
     if not st.get("connected"):
         raise SystemExit("the simulator isn't connected to the camera")
@@ -116,7 +126,12 @@ def main():
     report["preview_fps"] = state(base)["status"].get("fps")
     for _ in range(a.photos):
         t0 = time.time()
-        r = call(base, {"cmd": "photo"})
+        try:
+            r = call(base, {"cmd": "photo"})
+        except urllib.error.HTTPError:
+            # the USB link lost the reply; the photo itself is checked in the list below
+            report["problems"].append("a photo's reply was lost on the USB link (laptop side only)")
+            continue
         wall = time.time() - t0
         if not r.get("ok"):
             report["problems"].append(f"photo failed: {r}")

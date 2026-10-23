@@ -8,3 +8,4 @@ host/__pycache__/
 cad/.venv/
 firmware/.cache/
 __pycache__/
+host/wifi-report.json

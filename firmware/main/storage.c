@@ -40,6 +40,7 @@ static const char *TAG = "storage";
 
 static sdmmc_card_t *s_card;
 static uint8_t *s_bounce;   /* internal RAM, DMA-capable */
+static uint8_t *s_media;    /* storage_media_buf() */
 static bool s_ready;
 static int s_next = 1;
 
@@ -69,7 +70,8 @@ static void thumb_path(const char *name, char *out, size_t len)
 esp_err_t storage_init(void)
 {
     s_bounce = heap_caps_malloc(BOUNCE_SIZE, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
-    if (!s_bounce) return ESP_ERR_NO_MEM;
+    s_media = heap_caps_malloc(STORAGE_MEDIA_BUF, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+    if (!s_bounce || !s_media) return ESP_ERR_NO_MEM;
 
     sdmmc_host_t host = SDMMC_HOST_DEFAULT();
     host.flags = SDMMC_HOST_FLAG_1BIT;
@@ -143,6 +145,11 @@ esp_err_t storage_format(void)
      * never shares a name with a new one. */
     ESP_LOGI(TAG, "card formatted");
     return ESP_OK;
+}
+
+uint8_t *storage_media_buf(void)
+{
+    return s_media;
 }
 
 bool storage_ready(void)
@@ -288,6 +295,7 @@ esp_err_t storage_list(storage_item_t **out, int *count)
 
 FILE *storage_open(const char *name, bool thumb, uint32_t *size)
 {
+    if (strcmp(name, "frame.json") == 0) return thumb ? NULL : storage_frame_open(size);   /* for the USB link */
     if (!s_ready || parse_name(name, NULL) < 0) return NULL;
     char path[64];
     if (thumb) {
