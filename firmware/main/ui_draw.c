@@ -5,6 +5,7 @@
 
 #include "ui.h"
 #include "gfx.h"
+#include "phone.h"     /* PHONE_HOST, for the address on the Phone mode screen */
 
 #include <stdio.h>
 #include <string.h>
@@ -191,7 +192,7 @@ static void draw_phone(const ui_state_t *s, const ui_overlay_t *o)
         gfx_text(SMALL, tx, ty, "2 Scan to see", C_LILAC, -1);
         gfx_text(SMALL, tx, ty + 16, "  the photos", C_LILAC, -1);
         gfx_text(SMALL, tx, ty + 38, "or open", C_GREY, -1);
-        gfx_text(SMALL, tx, ty + 54, "192.168.4.1", C_WHITE, -1);
+        gfx_text(SMALL, tx, ty + 54, PHONE_HOST ".local", C_WHITE, -1);
         snprintf(line, sizeof(line), s->clients == 1 ? "1 phone on" : "%d phones on", s->clients);
         gfx_circle(tx + 3, ty + 82, 3, C_GREEN);
         gfx_text(SMALL, tx + 10, ty + 74, line, C_GREEN, -1);

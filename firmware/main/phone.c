@@ -33,6 +33,7 @@
 #include "esp_timer.h"
 #include "esp_wifi.h"
 #include "cJSON.h"
+#include "mdns.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
@@ -51,7 +52,7 @@ extern const uint8_t icon_png_end[] asm("_binary_icon_180_png_end");
  * task, so it has one buffer: the one storage sets aside, shared with video recording.
  * big_task has its own, smaller one (BIG_BUF). */
 #define CHUNK STORAGE_MEDIA_BUF
-#define BIG_BUF (8 * 1024)
+#define BIG_BUF (4 * 1024)    /* 4 KB reads still outpace Wi-Fi; 8 KB left too little free with mDNS */
 #define FRAME_MAX CHUNK    /* the mailbox fits the read buffer, so it's received and sent in one piece */
 
 static uint8_t *s_chunk;
@@ -485,6 +486,17 @@ static uint8_t pick_channel(void)
     return best;
 }
 
+/* PHONE_HOST.local, answered by mDNS on the camera's network. Started before the network
+ * comes up, so it sees it start; its memory is in PSRAM (sdkconfig.defaults). */
+static void name_start(void)
+{
+    esp_err_t err = mdns_init();
+    if (err == ESP_OK) err = mdns_hostname_set(PHONE_HOST);
+    if (err == ESP_OK) err = mdns_instance_name_set(s_ssid);
+    if (err == ESP_OK) err = mdns_service_add(NULL, "_http", "_tcp", 80, NULL, 0);
+    if (err != ESP_OK) ESP_LOGW(TAG, "no %s.local, only 192.168.4.1: %s", PHONE_HOST, esp_err_to_name(err));
+}
+
 esp_err_t phone_start(const char *ssid, const char *pass, const char *owner)
 {
     if (s_running) return ESP_OK;
@@ -516,12 +528,13 @@ esp_err_t phone_start(const char *ssid, const char *pass, const char *owner)
     ap.ap.pmf_cfg.required = false;
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap));
+    name_start();
     esp_err_t err = esp_wifi_start();
-    if (err != ESP_OK) return err;
+    if (err != ESP_OK) { mdns_free(); return err; }
     s_clients = 0;
     big_start();
     err = start_http();
-    if (err != ESP_OK) { big_stop(); esp_wifi_stop(); return err; }
+    if (err != ESP_OK) { big_stop(); esp_wifi_stop(); mdns_free(); return err; }
     s_running = true;
     s_heap_min = -1;
     ESP_LOGI(TAG, "Wi-Fi \"%s\" up, page at %s", ssid, PHONE_URL);
@@ -536,6 +549,7 @@ void phone_stop(void)
     httpd_stop(s_http);
     s_http = NULL;
     esp_wifi_stop();
+    mdns_free();
     s_clients = 0;
     s_running = false;
     s_chunk = NULL;
