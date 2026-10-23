@@ -12,7 +12,8 @@
  *   POST /api/frame        body: the whole mailbox document, at most 16 KB
  *
  * All camera and SD work otherwise happens on cam_task; in Phone mode the camera is
- * idle, so the web server's task is the only one reading the card.
+ * idle, so only the web server reads the card: its own task, and big_task for full photos,
+ * videos and the page (see "big downloads").
  */
 
 #include "phone.h"
@@ -32,6 +33,11 @@
 #include "esp_timer.h"
 #include "esp_wifi.h"
 #include "cJSON.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+#include "freertos/semphr.h"
+#include "freertos/task.h"
+#include "lwip/sockets.h"
 
 static const char *TAG = "phone";
 
@@ -42,8 +48,10 @@ extern const uint8_t icon_png_end[] asm("_binary_icon_180_png_end");
 
 /* Reads go into internal RAM: the SD driver can't DMA into PSRAM and falls back to one
  * 512-byte sector per transfer. The web server runs handlers one at a time on its own
- * task, so one buffer is enough: the one storage sets aside, shared with video recording. */
+ * task, so it has one buffer: the one storage sets aside, shared with video recording.
+ * big_task has its own, smaller one (BIG_BUF). */
 #define CHUNK STORAGE_MEDIA_BUF
+#define BIG_BUF (8 * 1024)
 #define FRAME_MAX CHUNK    /* the mailbox fits the read buffer, so it's received and sent in one piece */
 
 static uint8_t *s_chunk;
@@ -124,12 +132,15 @@ static esp_err_t list(httpd_req_t *req)
     return err;
 }
 
-/* Send an open file in CHUNK pieces, and close it */
-static esp_err_t send_open_file(httpd_req_t *req, FILE *f)
+static volatile bool s_big_quit;   /* Phone mode is ending: stop sending */
+
+/* Send an open file through buf in pieces, and close it */
+static esp_err_t send_open_file(httpd_req_t *req, FILE *f, uint8_t *buf, size_t cap)
 {
     esp_err_t err = ESP_OK;
     size_t n;
-    while (err == ESP_OK && (n = fread(s_chunk, 1, CHUNK, f)) > 0) err = httpd_resp_send_chunk(req, (const char *)s_chunk, n);
+    while (err == ESP_OK && !s_big_quit && (n = fread(buf, 1, cap, f)) > 0) err = httpd_resp_send_chunk(req, (const char *)buf, n);
+    if (s_big_quit) err = ESP_FAIL;
     fclose(f);
     heap_sample(NULL);
     if (err == ESP_OK) err = httpd_resp_send_chunk(req, NULL, 0);
@@ -147,6 +158,8 @@ static bool uri_name(httpd_req_t *req, const char *prefix, char *name, size_t ca
     return true;
 }
 
+static uint8_t *s_big_buf;
+
 static esp_err_t send_file(httpd_req_t *req, bool thumb)
 {
     char name[STORAGE_NAME_LEN];
@@ -159,7 +172,8 @@ static esp_err_t send_file(httpd_req_t *req, bool thumb)
     /* names are never reused (numbers keep counting), so the phone may keep copies */
     httpd_resp_set_hdr(req, "Cache-Control", "max-age=31536000, immutable");
     int64_t t0 = esp_timer_get_time();
-    esp_err_t err = send_open_file(req, f);
+    /* thumbnails are sent by the server's task, full files by big_task: each has its buffer */
+    esp_err_t err = thumb ? send_open_file(req, f, s_chunk, CHUNK) : send_open_file(req, f, s_big_buf, BIG_BUF);
     if (err == ESP_OK && !thumb) {
         /* time from first read to last byte handed to Wi-Fi: card and Wi-Fi together */
         float s = (esp_timer_get_time() - t0) / 1e6f;
@@ -206,7 +220,7 @@ static esp_err_t small(httpd_req_t *req)
     FILE *kept = storage_small_open(name, w, h, &kept_size);
     if (kept) {
         fclose(f);
-        return send_open_file(req, kept);
+        return send_open_file(req, kept, s_chunk, CHUNK);
     }
 
     /* Not made yet: read the photo into PSRAM, through the internal buffer (the SD driver
@@ -296,6 +310,108 @@ static esp_err_t frame_post(httpd_req_t *req)
     return httpd_resp_sendstr(req, "{\"ok\":true}");
 }
 
+/* ---------------------------------------------------------------- big downloads */
+
+/* The server runs one handler at a time, so a slow one holds up every other client: on
+ * 24 Oct a 4.9 MB video to the iPhone held it for 42 s, and the frame's requests timed out
+ * behind it (the frame gives up at 8 s). Full photos, videos and the page are handed to
+ * big_task instead, through an async copy of the request, so the server stays free for
+ * thumbnails, the mailbox and the frame. big_task sends them one at a time, in the order
+ * asked, which is how the page asks for them anyway. */
+#define BIG_QUEUE 6        /* fewer than max_open_sockets; a full queue sends on the server's task */
+#define BIG_STACK 4096
+
+typedef struct {
+    httpd_req_t *req;      /* the async copy; NULL tells big_task to end */
+    esp_err_t (*handler)(httpd_req_t *);
+    bool frame;
+    int64_t asked_us;
+} big_job_t;
+
+static QueueHandle_t s_big_q;
+static SemaphoreHandle_t s_big_ended;
+static bool s_big_on;
+static volatile int s_big_fd = -1;    /* the socket big_task is sending on */
+
+/* Requests that kept a sender busy 200 ms or more, or waited that long in big_task's queue,
+ * with who asked: what the frame waited behind, if it waited */
+#define SLOW_MS 200
+static void log_slow(httpd_req_t *req, bool frame, int64_t t0, int queued_ms, esp_err_t err)
+{
+    int ms = (int)((esp_timer_get_time() - t0) / 1000);
+    if (ms < SLOW_MS && queued_ms < SLOW_MS) return;
+    char queued[32] = "";
+    if (queued_ms >= SLOW_MS) snprintf(queued, sizeof(queued), " after %d ms queued", queued_ms);
+    ESP_LOGI(TAG, "slow: %s %.60s for the %s, socket %d: %d ms%s%s", req->method == HTTP_POST ? "POST" : "GET",
+             req->uri, frame ? "frame" : "phone", httpd_req_to_sockfd(req), ms, queued, err == ESP_OK ? "" : ", failed");
+}
+
+static void big_task(void *arg)
+{
+    big_job_t job;
+    while (xQueueReceive(s_big_q, &job, portMAX_DELAY) == pdTRUE && job.req) {
+        int64_t t0 = esp_timer_get_time();
+        s_big_fd = httpd_req_to_sockfd(job.req);
+        esp_err_t err = s_big_quit ? ESP_FAIL : job.handler(job.req);
+        s_big_fd = -1;
+        log_slow(job.req, job.frame, t0, (int)((t0 - job.asked_us) / 1000), err);
+        if (err != ESP_OK) httpd_sess_trigger_close(job.req->handle, httpd_req_to_sockfd(job.req));   /* as the server does */
+        httpd_req_async_handler_complete(job.req);
+    }
+    xSemaphoreGive(s_big_ended);
+    vTaskDelete(NULL);
+}
+
+/* Wraps every handler: full photos, videos and the page go to big_task, the rest run here */
+static esp_err_t timed(httpd_req_t *req)
+{
+    esp_err_t (*handler)(httpd_req_t *) = req->user_ctx;
+    bool frame = from_frame(req);
+    int64_t t0 = esp_timer_get_time();
+    if (s_big_on && (handler == file || handler == page)) {
+        big_job_t job = { .handler = handler, .frame = frame, .asked_us = t0 };
+        if (httpd_req_async_handler_begin(req, &job.req) == ESP_OK) {
+            if (xQueueSend(s_big_q, &job, 0) == pdTRUE) return ESP_OK;
+            httpd_req_async_handler_complete(job.req);   /* queue full: send it here, as before */
+        }
+    }
+    esp_err_t err = handler(req);
+    log_slow(req, frame, t0, 0, err);
+    return err;
+}
+
+/* Start big_task for this Phone mode. Without the memory for it, everything is sent on the
+ * server's task, as before 0.4.2. */
+static void big_start(void)
+{
+    if (!s_big_q) s_big_q = xQueueCreate(BIG_QUEUE, sizeof(big_job_t));
+    if (!s_big_ended) s_big_ended = xSemaphoreCreateBinary();
+    s_big_buf = heap_caps_malloc(BIG_BUF, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+    s_big_quit = false;
+    if (s_big_q && s_big_ended && s_big_buf && xTaskCreate(big_task, "phone_big", BIG_STACK, NULL, 5, NULL) == pdPASS) {
+        s_big_on = true;
+        return;
+    }
+    ESP_LOGW(TAG, "no memory for big_task: full files go on the server's task");
+    free(s_big_buf);
+    s_big_buf = NULL;
+}
+
+/* End big_task before the server stops; whatever it's sending is cut short */
+static void big_stop(void)
+{
+    if (!s_big_on) return;
+    s_big_on = false;
+    s_big_quit = true;
+    int fd = s_big_fd;
+    if (fd >= 0) shutdown(fd, SHUT_RDWR);    /* a send waiting on a slow phone returns now */
+    big_job_t end = { 0 };
+    xQueueSend(s_big_q, &end, portMAX_DELAY);
+    xSemaphoreTake(s_big_ended, portMAX_DELAY);
+    free(s_big_buf);
+    s_big_buf = NULL;
+}
+
 /* cJSON's nodes for a 300-photo mailbox take about 50 KB: keep them out of internal RAM */
 static void *json_malloc(size_t n) { return heap_caps_malloc(n, MALLOC_CAP_SPIRAM); }
 
@@ -325,7 +441,12 @@ static esp_err_t start_http(void)
         { .uri = "/api/frame",  .method = HTTP_GET,  .handler = frame_get },
         { .uri = "/api/frame",  .method = HTTP_POST, .handler = frame_post },
     };
-    for (int i = 0; i < sizeof(uris) / sizeof(uris[0]); i++) httpd_register_uri_handler(s_http, &uris[i]);
+    for (int i = 0; i < sizeof(uris) / sizeof(uris[0]); i++) {
+        httpd_uri_t u = uris[i];
+        u.user_ctx = (void *)u.handler;
+        u.handler = timed;
+        httpd_register_uri_handler(s_http, &u);
+    }
     return ESP_OK;
 }
 
@@ -398,8 +519,9 @@ esp_err_t phone_start(const char *ssid, const char *pass, const char *owner)
     esp_err_t err = esp_wifi_start();
     if (err != ESP_OK) return err;
     s_clients = 0;
+    big_start();
     err = start_http();
-    if (err != ESP_OK) { esp_wifi_stop(); return err; }
+    if (err != ESP_OK) { big_stop(); esp_wifi_stop(); return err; }
     s_running = true;
     s_heap_min = -1;
     ESP_LOGI(TAG, "Wi-Fi \"%s\" up, page at %s", ssid, PHONE_URL);
@@ -410,6 +532,7 @@ esp_err_t phone_start(const char *ssid, const char *pass, const char *owner)
 void phone_stop(void)
 {
     if (!s_running) return;
+    big_stop();
     httpd_stop(s_http);
     s_http = NULL;
     esp_wifi_stop();

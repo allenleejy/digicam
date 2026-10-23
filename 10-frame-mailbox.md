@@ -105,6 +105,10 @@ The real photo, shrunk for a small screen. The thumbnails are the preview frame 
 
 Numbering used to start again at `DSC_0001` after a format and a restart, which could confuse the phone page's "saved" ticks and Safari's cache (names are served as `immutable`). Since 0.4.1 the next number is also kept in NVS (`digicam` / `next_num`), and the camera uses the higher of that and the card's highest file. The mailbox and the frame know a photo by name and size, so they were never confused by it.
 
+## Big downloads on their own task (firmware 0.4.2)
+
+The web server runs one handler at a time. On 24 Oct, with an iPhone on the phone page, a 4.9 MB video took 42 s to send and the frame's `GET /api/frame` timed out behind it twice (the frame gives up at 8 s); the page itself (60 KB) once took 9.9 s, and single photos 2–5 s when the phone read slowly. Since 0.4.2, `/file/` and `/` are handed to a second task (`big_task` in `phone.c`, through ESP-IDF's async requests), which sends them one at a time in the order asked, with its own 8 KB read buffer. Thumbnails, `/small`, `/api/list` and the mailbox stay on the server's task, so they no longer wait behind a download. With the same iPhone tests the frame had 7 visits out of 7, the slowest answered in 341 ms, one of them in the middle of a 2 MB video. Internal RAM in Phone mode: lowest 32 KB (0.4.1: 46 KB in the same test). Requests that take 200 ms or more are logged (`phone: slow: ...`), with any time spent queued for `big_task`.
+
 ## Tests
 
 From a laptop joined to the camera's Wi-Fi:
@@ -139,7 +143,7 @@ Then:
 
 | | |
 | --- | --- |
-| Firmware version and items | 0.4.0: items 1, 2, 3 and 5. 0.4.1: item 4 too, and the file-number fix |
+| Firmware version and items | 0.4.0: items 1, 2, 3 and 5. 0.4.1: item 4 too, and the file-number fix. 0.4.2: big downloads on their own task |
 | A `frame.json` the page wrote | `{"v":1,"rev":5,"interval":5,"transition":"cut","look":"natural","order":"newest","brightness":100,"items":[{"n":"DSC_0010.JPG","s":144739},{"n":"DSC_0009.JPG","s":135898},{"n":"DSC_0008.JPG","s":123796},{"n":"DSC_0005.JPG","s":113512}]}` (from an iPhone, 23 Oct, read off the camera over USB) |
 | Internal free heap after a `POST /api/frame` | (camera log: "phone: heap after POST /api/frame: internal free N KB, largest block N KB, lowest N KB") |
 | Internal free heap in Phone mode, nobody joined | 38 KB, largest block 26 KB (0.4.0, 23 Oct) |
