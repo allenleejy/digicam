@@ -11,7 +11,7 @@ You chose not to pay for the Apple Developer Program, so this replaces the app p
 1. **On the camera:** hold ●, choose **Phone**. The screen shows a QR code with the Wi-Fi name and password. Shutter or hold ● turns it off. ● switches between the two QR codes by hand.
 2. **On the iPhone:**
    - Point the Camera app at the QR code and tap **Join**.
-   - The camera's screen changes to a second QR code: scan it, and Safari opens the photos at http://192.168.4.1.
+   - The camera's screen changes to a second QR code: scan it, and Safari opens the photos at http://gallery.local (since 0.4.3; http://192.168.4.1 works too).
 3. **Save one photo:** tap it, press and hold, tap **Save to Photos**. No setup at all.
 4. **Save many at once:** tap **Select** (or **Save N new**). A free Shortcut called "Save from Digicam", set up once, downloads them all into Photos.
    - The page shows the setup steps the first time.

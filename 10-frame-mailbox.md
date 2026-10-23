@@ -143,7 +143,7 @@ Then:
 
 | | |
 | --- | --- |
-| Firmware version and items | 0.4.0: items 1, 2, 3 and 5. 0.4.1: item 4 too, and the file-number fix. 0.4.2: big downloads on their own task |
+| Firmware version and items | 0.4.0: items 1, 2, 3 and 5. 0.4.1: item 4 too, and the file-number fix. 0.4.2: big downloads on their own task. 0.4.3: the page at http://gallery.local (the frame still uses 192.168.4.1) |
 | A `frame.json` the page wrote | `{"v":1,"rev":5,"interval":5,"transition":"cut","look":"natural","order":"newest","brightness":100,"items":[{"n":"DSC_0010.JPG","s":144739},{"n":"DSC_0009.JPG","s":135898},{"n":"DSC_0008.JPG","s":123796},{"n":"DSC_0005.JPG","s":113512}]}` (from an iPhone, 23 Oct, read off the camera over USB) |
 | Internal free heap after a `POST /api/frame` | (camera log: "phone: heap after POST /api/frame: internal free N KB, largest block N KB, lowest N KB") |
 | Internal free heap in Phone mode, nobody joined | 38 KB, largest block 26 KB (0.4.0, 23 Oct) |
