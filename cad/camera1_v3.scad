@@ -68,8 +68,14 @@ chg_usb_z = 2.6;        // USB-C socket centre above the module's back face: MEA
 
 btn = 5.0;              // tactile switch, flat feet
 btn_h = 6.0;            // base to top of the plunger
-btn_feet = 7.6;         // feet, tip to tip: MEASURE
-btn_body = 3.5;         // base to the switch's metal top (the snap fingers catch this edge): MEASURE
+btn_feet = 8.0;         // feet, tip to tip (datasheet 8.0 +-0.3)
+btn_body = 3.6;         // base to the body's metal top (the snap fingers catch this edge), datasheet
+// The three back switches are 6 x 6 SMD tactile switches with FOUR gull-wing legs, two out of each of the
+// +-X sides near the corners (legs 0.7 wide, centres 4.5 apart in Y, flat feet 0.3 below the body's base).
+btn_w = 5.8;            // their body, measured 5.7-5.8 (the datasheet says 6.0)
+btn_leg_y = 2.25;       // leg centre, either side of the middle of the body
+btn_leg_w = 0.7;
+btn_leg_drop = 0.3;     // how far the feet sit below the body's base
 
 sw = [8.6, 3.6, 3.6];   // slide switch body: length (slide direction), height (knob side), width
 sw_knob = [2.0, 1.5, 1.5];
@@ -403,18 +409,23 @@ module bezel() {   // outer face on top (z = bezel_t), as printed
 // wires make one piece you can solder and test before it goes in. Their wires leave through the
 // slots. The carrier then screws to the two posts on the back plate (M2 x 6, self-tapping), which
 // sets the switches 0.1 mm behind the caps' flanges.
-snap_reach = clr + 0.35;   // how far each finger's catch reaches in from the pocket wall (0.35 mm over the switch)
+pk = 0.2;                  // clearance round the switch body
+pi_ = btn_w / 2 + pk;      // pocket half-width
+po_ = pi_ + 1.2;           // outer half-width
+snap_reach = pk + 0.35;    // how far each finger's catch reaches in from the pocket wall (0.35 mm over the switch)
 snap_w = 3.0;              // finger width
 snap_t = 0.9;              // finger thickness
 z_snap = z_btn_base - btn_body - 0.05;   // the catch face, just past the switch's top
+leg_y0 = 1.5;              // the legs' notch: wider than a leg (1.9-2.6) so either reading of the drawing fits
+wire_x0 = btn_feet / 2 + 0.2;            // the wire holes start just past the foot tips
+wire_w = 1.0;
 module carrier() {
     difference() {
         union() {
             zbox(carrier_xy[0], carrier_xy[1], carrier_sz[0], carrier_sz[1], z_btn_base, z_btn_base + carrier_t);
-            for (x = btn_xs) zbox(x - btn / 2 - clr - 1.2, btn_y - btn / 2 - clr - 1.2, btn + 2 * clr + 2.4, btn + 2 * clr + 2.4,
-                                  z_btn_base - carrier_wall, z_btn_base + 0.01);
-            // snap fingers on the two walls without feet: run on past the switch's top, a catch with a lead-in
-            for (x = btn_xs, s = [-1, 1]) let(yi = btn_y + s * (btn / 2 + clr)) {
+            for (x = btn_xs) zbox(x - po_, btn_y - po_, 2 * po_, 2 * po_, z_btn_base - carrier_wall, z_btn_base + 0.01);
+            // snap fingers on the two walls without legs: run on past the switch's top, a catch with a lead-in
+            for (x = btn_xs, s = [-1, 1]) let(yi = btn_y + s * pi_) {
                 zbox(x - snap_w / 2, s < 0 ? yi - snap_t : yi, snap_w, snap_t, z_snap - 0.7, z_btn_base - carrier_wall + 0.01);
                 hull() {
                     zbox(x - snap_w / 2, s < 0 ? yi - 0.01 : yi - snap_reach, snap_w, snap_reach + 0.01, z_snap - 0.01, z_snap);
@@ -423,17 +434,25 @@ module carrier() {
             }
         }
         // slits either side of each finger, down to the floor, so it can flex
-        for (x = btn_xs, s = [-1, 1], dx = [-1, 1]) let(yi = btn_y + s * (btn / 2 + clr))
+        for (x = btn_xs, s = [-1, 1], dx = [-1, 1]) let(yi = btn_y + s * pi_)
             zbox(x + dx * (snap_w / 2 + 0.25) - 0.25, s < 0 ? yi - 1.3 : yi - 0.1, 0.5, 1.4, z_snap - 1, z_btn_base + 0.01);
         // the finger is thinner than the wall
-        for (x = btn_xs, s = [-1, 1]) let(yi = btn_y + s * (btn / 2 + clr))
+        for (x = btn_xs, s = [-1, 1]) let(yi = btn_y + s * pi_)
             zbox(x - snap_w / 2, s < 0 ? yi - 1.3 : yi + snap_t, snap_w, 1.3 - snap_t, z_snap - 1, z_btn_base + 0.01);
         for (x = btn_xs) {
-            // the switch body, and its feet out to each side
-            zbox(x - btn / 2 - clr, btn_y - btn / 2 - clr, btn + 2 * clr, btn + 2 * clr, z_snap, z_btn_base + 0.01);   // stops at the catches
-            zbox(x - btn_feet / 2 - clr, btn_y - 1.6, btn_feet + 2 * clr, 3.2, z_btn_base - 1.2, z_btn_base + 0.01);
-            // wires out through the floor, beside the feet
-            for (s = [-1, 1]) zbox(x + s * (btn_feet / 2 - 0.6) - 1.2, btn_y - 1.6 - 1.4, 2.4, 1.4, z_btn_base - 1, z_btn_base + carrier_t + 1);
+            // the switch body, stopping at the catches
+            zbox(x - pi_, btn_y - pi_, 2 * pi_, 2 * pi_, z_snap, z_btn_base + 0.01);
+            for (sx = [-1, 1], sy = [-1, 1]) {
+                // each leg leaves through a notch in the side wall, over its full height, so there is room to solder...
+                zbox(sx < 0 ? x - po_ - 0.01 : x + pi_ - 0.01, sy < 0 ? btn_y - pi_ : btn_y + leg_y0, po_ - pi_ + 0.02, pi_ - leg_y0,
+                     z_btn_base - carrier_wall - 1, z_btn_base + 0.01);
+                // ...its foot sinks into the floor, so the body's base sits flat on it...
+                zbox(sx < 0 ? x - btn_feet / 2 - 0.35 : x + btn_w / 2 - 0.05, sy < 0 ? btn_y - pi_ : btn_y + leg_y0,
+                     btn_feet / 2 + 0.35 - btn_w / 2 + 0.05, pi_ - leg_y0, z_btn_base - 0.01, z_btn_base + btn_leg_drop + 0.15);
+                // ...and the wire comes through a hole just past its tip, to fold back onto the foot
+                zbox(sx < 0 ? x - wire_x0 - wire_w : x + wire_x0, sy < 0 ? btn_y - pi_ : btn_y + leg_y0, wire_w, pi_ - leg_y0,
+                     z_btn_base - 1, z_btn_base + carrier_t + 1);
+            }
         }
         for (b = carrier_bosses) zcyl(b, 2.4, z_btn_base - 1, z_btn_base + carrier_t + 1);
     }
@@ -705,8 +724,8 @@ module ghost(name) {
     if (name == "screen") zbox(scr_xy[0] + e, scr_xy[1] + e, scr[0] - 2 * e, scr[1] - 2 * e, z_bi + e, z_bi + scr_t);
     if (name == "charger") zbox(chg_xy[0] + e, chg_xy[1] + e, chg[0] - 2 * e, chg[1] - 2 * e, z_chg0, z_chg0 + chg_t);
     if (name == "buttons") for (x = btn_xs) {
-        zbox(x - btn / 2 + e, btn_y - btn / 2 + e, btn - 2 * e, btn - 2 * e, z_btn_base - btn_body, z_btn_base - e);
-        zbox(x - btn_feet / 2 + e, btn_y - 1.5, btn_feet - 2 * e, 3, z_btn_base - 0.6, z_btn_base - e);
+        zbox(x - btn_w / 2 + e, btn_y - btn_w / 2 + e, btn_w - 2 * e, btn_w - 2 * e, z_btn_base - btn_body, z_btn_base - e);
+        for (sy = [-1, 1]) zbox(x - btn_feet / 2 + e, btn_y + sy * btn_leg_y - btn_leg_w / 2, btn_feet - 2 * e, btn_leg_w, z_btn_base, z_btn_base + btn_leg_drop - e);
         translate([x, btn_y, z_plunger + e]) cylinder(d = 2.5, h = btn_h - btn_body - e);
     }
     if (name == "shutter") {
