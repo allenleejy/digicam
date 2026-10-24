@@ -17,6 +17,7 @@ This is a separate project from `../PLAN.md`. That file (July 2026) plans a scre
 | `04-case-design.md` | Camera 1 case. **v2 test-fit body (10 Oct)** first: electronics sled, layout, wiring lanes, hardware, assembly, printing, what to measure. Then the v1 concept |
 | `08-phone-app-plan.md` | Getting photos onto an iPhone: **Phone mode** (camera Wi-Fi, a photo page in Safari, a free Shortcut for saving many), built 15 Oct. Then the earlier app plan |
 | `11-assembly-guide-v3.md` | **Build either v3 body (23 Oct)**, with an interactive 3D version at https://claude.ai/artifact/BogmuenUrWaN1Fk98t3Pgy (`guide-v3/`): tools and parts, heat-set inserts, the wiring diagram (part pin to board pad), wire routes and cut lengths, soldering, ten build steps with pictures, what holds each part, checks and fixes |
+| `12-packing-list-retro.md` | **Packing list for building the retro camera (24 Oct)**: what to do before leaving, all 20 printed pieces, electronics, screws and inserts by length, wire/tape/glue, tools, cables, offline guides |
 | `10-frame-mailbox.md` | **DigiGallery frame mailbox (22 Oct)**: the phone page picks what Allen's desk frame shows; `/api/frame` on the camera, the document's format, tests |
 | `09-phone-ui-design.md` | **Phone page v2 plan (21 Oct)**: design, mockup in `design/phone-v2/`, the home-screen app evaluated, firmware changes it needs |
 | `07-shopping-list.md` | What's still to buy to join the parts: battery socket, camera ribbon, wire, inserts, screws, tape, with Lazada search terms |

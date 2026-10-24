@@ -127,8 +127,8 @@ Everything prints flat without supports at 0.2 mm layers with 3 walls. The STLs 
 | Item | Clear | Retro |
 | --- | --- | --- |
 | M2 heat-set inserts (3.5 mm OD) | 11 (8 in the frame's corner posts, 3 in the sled blocks) | 16 (+2 under the top wall for the top plate, +3 in the lens barrel) |
-| M2 × 5 button head | 8 (plates) + 4 (board to sled) | 8 + 4, + 3 (barrel, from inside the front plate) |
-| M2 × 4 | 3 (sled to frame) | 3 |
+| M2 × 5 button head | 8 (plates) | 8, + 3 (barrel, from inside the front plate) |
+| M2 × 4 | 3 (sled to frame) + 4 (board to sled: a × 5 reaches the screen's back) | 3 + 4 |
 | M2 × 6, or × 5 | 2 (button carrier to the back plate's posts) | 2 |
 | M2 × 14 countersunk (flat head) | | 2 (top plate, from the top: visible, as on old cameras). Not in your kit; M2 × 12 will also do |
 | Foam tape | Battery to back plate, camera to module (0.4 mm), screen to sled (0.5 mm) | Same |

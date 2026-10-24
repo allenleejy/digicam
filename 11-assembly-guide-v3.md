@@ -55,8 +55,9 @@ Fault-finding is easy on the desk and miserable inside a closed case, so don't s
 | | Clear | Retro |
 | --- | --- | --- |
 | M2 heat-set inserts, 3.5 mm OD | 11 | 16 |
-| M2 × 5 (back and front plates, board to sled) | 12 | 12 |
+| M2 × 5 (back and front plates) | 8 | 8 |
 | M2 × 5 (lens barrel, from inside the front plate) | | 3 |
+| M2 × 4 (board to sled; a × 5 would touch the screen's back) | 4 | 4 |
 | M2 × 4 (sled to frame) | 3 | 3 |
 | M2 × 6 or × 5 (button carrier to the back plate) | 2 | 2 |
 | M2 × 14 countersunk, or × 12 (top plate, from the top) | | 2 |
@@ -253,7 +254,7 @@ The electronics are now one connected bundle. Each step below puts one part of i
 1. **Screen wires:** thread all 8 up through the sled's slot at the screen's pin end.
 2. **Board:** set it on the sled's four spacers, component side up.
 3. **Solder the screen wires:** feed each one up through its board pad from underneath (by label: VCC→3V3, GND→GND, SCL→21, SDA→47, RES→EN, DC→41, CS→42, BLK→46) and solder on top.
-4. **Screw the board down:** 4 screws (M2 × 5) into the spacers.
+4. **Screw the board down:** 4 screws (**M2 × 4**, not × 5: a 5 mm screw reaches the back of the screen) into the spacers.
 5. **Camera:**
    1. Stick a square of 0.4 mm foam tape on the ESP32 module's metal shield.
    2. Fold the camera over onto it, **lens facing up, away from the board**.
