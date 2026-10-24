@@ -5,12 +5,12 @@ How the phone page decides what **DigiGallery**, Allen's desk photo frame, shows
 - **History:** this replaces the 21 Oct `/small` connector request. Its file-number fix moves to after the gift.
 - **Upkeep:** keep this doc up to date. If the contract changes in a way an old frame wouldn't understand, raise `v`.
 
-| Item | Status (22 Oct 2026) |
+| Item | Status (23 Oct 2026) |
 | --- | --- |
-| 1. `GET` and `POST /api/frame` | In firmware 0.4.0, flashed 23 Oct. Not yet tried over Wi-Fi |
+| 1. `GET` and `POST /api/frame` | In firmware 0.4.0, flashed 23 Oct; tried over Wi-Fi with the frame and an iPhone the same day |
 | 2. The document (below) | Written by the phone page exactly as specified |
-| 3. Phone page: Frame pill and sheet, badges, viewer button, Send to frame | In the new-design page (23 Oct), tested on the laptop (`host/server.py` at `/phone/`). Not yet tried on an iPhone |
-| 4. `/small` (optional) | Not built: after the gift unless 1–3 are done and tested by 25 Oct |
+| 3. Phone page: Frame pill and sheet, badges, viewer button, Send to frame | In the new-design page (23 Oct), tested on the laptop (`host/server.py` at `/phone/`). Main flows tried on an iPhone, 23 Oct |
+| 4. `/small` (optional) | In firmware 0.4.1 (23 Oct, written by Allen's session): `small.c`, cached in `DCIM/.small/` |
 | 5. "frame here" on the camera's screen (optional) | Built: shown when a `DigiGallery/` client reads `/api/frame` |
 
 ## The frame (nothing to change on the camera for this)
@@ -86,7 +86,7 @@ The frame shows exactly the photos in `items`. With no document, the frame uses 
 - **Photos deleted on the camera itself** stay on the list. The sheet shows "N more only on the frame" with a "Take them off" link.
 - **More than 300:** refused with a toast.
 
-## Optional item 4: `GET /small/NAME?w=W&h=H` (not built)
+## Item 4: `GET /small/NAME?w=W&h=H` (firmware 0.4.1)
 
 The real photo, shrunk for a small screen. The thumbnails are the preview frame from just before the shot, so they're soft and dull.
 
@@ -99,10 +99,15 @@ The real photo, shrunk for a small screen. The thumbnails are the preview frame 
   4. Encode with `fmt2jpg()`: baseline, quality about 80.
 - **Cache:** saved as `DCIM/.small/DSC_nnnn_WxH.JPG` through a temp file. `storage_delete` removes the copies.
 - **Errors:** 500 on a decode or encode failure. The frame falls back to `/thumb` on any error.
+- **As built:** `small.c` decodes at the biggest reduction that still covers W × H, box-filters the middle, and encodes at quality 80; a picture over 24 KB is encoded again at 60, because the frame takes one picture of up to 32 KB at a time. The first request for a photo takes about a second (logged as `small: ... decode N ms, shrink N ms, encode N ms`); after that the copy on the card is sent. `GET /small` logs the internal free heap.
 
-## Later, not before the gift
+## The file-number fix (firmware 0.4.1)
 
-The file-number fix. Numbering starts again at `DSC_0001` after a format and a restart. The mailbox and the frame know a photo by name and size, so they aren't confused by it. The phone page's "saved" ticks and Safari's cache still can be.
+Numbering used to start again at `DSC_0001` after a format and a restart, which could confuse the phone page's "saved" ticks and Safari's cache (names are served as `immutable`). Since 0.4.1 the next number is also kept in NVS (`digicam` / `next_num`), and the camera uses the higher of that and the card's highest file. The mailbox and the frame know a photo by name and size, so they were never confused by it.
+
+## Big downloads on their own task (firmware 0.4.2)
+
+The web server runs one handler at a time. On 24 Oct, with an iPhone on the phone page, a 4.9 MB video took 42 s to send and the frame's `GET /api/frame` timed out behind it twice (the frame gives up at 8 s); the page itself (60 KB) once took 9.9 s, and single photos 2–5 s when the phone read slowly. Since 0.4.2, `/file/` and `/` are handed to a second task (`big_task` in `phone.c`, through ESP-IDF's async requests), which sends them one at a time in the order asked, with its own 8 KB read buffer. Thumbnails, `/small`, `/api/list` and the mailbox stay on the server's task, so they no longer wait behind a download. With the same iPhone tests the frame had 7 visits out of 7, the slowest answered in 341 ms, one of them in the middle of a 2 MB video. Internal RAM in Phone mode: lowest 32 KB (0.4.1: 46 KB in the same test). Requests that take 200 ms or more are logged (`phone: slow: ...`), with any time spent queued for `big_task`.
 
 ## Tests
 
@@ -138,7 +143,7 @@ Then:
 
 | | |
 | --- | --- |
-| Firmware version and items | 0.4.0: items 1, 2, 3 and 5 |
+| Firmware version and items | 0.4.0: items 1, 2, 3 and 5. 0.4.1: item 4 too, and the file-number fix. 0.4.2: big downloads on their own task. 0.4.3: the page at http://gallery.local (the frame still uses 192.168.4.1) |
 | A `frame.json` the page wrote | `{"v":1,"rev":5,"interval":5,"transition":"cut","look":"natural","order":"newest","brightness":100,"items":[{"n":"DSC_0010.JPG","s":144739},{"n":"DSC_0009.JPG","s":135898},{"n":"DSC_0008.JPG","s":123796},{"n":"DSC_0005.JPG","s":113512}]}` (from an iPhone, 23 Oct, read off the camera over USB) |
 | Internal free heap after a `POST /api/frame` | (camera log: "phone: heap after POST /api/frame: internal free N KB, largest block N KB, lowest N KB") |
 | Internal free heap in Phone mode, nobody joined | 38 KB, largest block 26 KB (0.4.0, 23 Oct) |

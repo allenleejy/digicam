@@ -5,10 +5,12 @@
  *   DCIM/DSC_0001.JPG          photos, full resolution
  *   DCIM/MOV_0002.AVI          videos, MJPEG
  *   DCIM/.thumbs/DSC_0001.JPG  preview-size thumbnail for each photo/video
+ *   DCIM/.small/DSC_0001_320x256.JPG  a photo made small for the frame (GET /small)
  *   frame.json                 the frame mailbox (outside DCIM)
  *
- * The file number is found by scanning the card at boot, so swapping cards
- * never overwrites a photo.
+ * The file number is the higher of what the card holds and what NVS remembers: the card,
+ * so swapping cards never overwrites a photo; NVS, so a format and a restart don't start
+ * again at 0001 (phones keep copies by name).
  */
 
 #include "storage.h"
@@ -26,6 +28,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "esp_vfs_fat.h"
+#include "nvs.h"
 #include "sdmmc_cmd.h"
 
 static const char *TAG = "storage";
@@ -35,6 +38,7 @@ static const char *TAG = "storage";
 #define FRAME_PATH STORAGE_ROOT "/frame.json"
 #define FRAME_TMP  STORAGE_ROOT "/frame.tmp"
 #define FRAME_OLD  STORAGE_ROOT "/frame.old"
+#define SMALL_TMP  STORAGE_SMALL "/.small.tmp"
 
 #define BOUNCE_SIZE (16 * 1024)
 
@@ -65,6 +69,33 @@ static void thumb_path(const char *name, char *out, size_t len)
 {
     /* MOV_0002.AVI -> .thumbs/MOV_0002.JPG */
     snprintf(out, len, STORAGE_THUMBS "/%.8s.JPG", name);
+}
+
+static void small_path(const char *name, int w, int h, char *out, size_t len)
+{
+    /* DSC_0001.JPG at 320x256 -> .small/DSC_0001_320x256.JPG */
+    snprintf(out, len, STORAGE_SMALL "/%.8s_%dx%d.JPG", name, w, h);
+}
+
+/* The next number, kept in NVS (namespace "digicam", next to the settings) */
+static int nvs_next(void)
+{
+    nvs_handle_t h;
+    int32_t n = 0;
+    if (nvs_open("digicam", NVS_READONLY, &h) == ESP_OK) {
+        nvs_get_i32(h, "next_num", &n);
+        nvs_close(h);
+    }
+    return n;
+}
+
+static void nvs_set_next(int n)
+{
+    nvs_handle_t h;
+    if (nvs_open("digicam", NVS_READWRITE, &h) != ESP_OK) return;
+    nvs_set_i32(h, "next_num", n);
+    nvs_commit(h);
+    nvs_close(h);
 }
 
 esp_err_t storage_init(void)
@@ -103,7 +134,9 @@ esp_err_t storage_init(void)
 
     mkdir(STORAGE_DCIM, 0775);
     mkdir(STORAGE_THUMBS, 0775);
+    mkdir(STORAGE_SMALL, 0775);
     unlink(PHOTO_TMP);
+    unlink(SMALL_TMP);
     unlink(VIDEO_TMP);
     /* A mailbox save cut off after the old one was moved aside: put the old one back */
     struct stat fst;
@@ -122,6 +155,9 @@ esp_err_t storage_init(void)
         closedir(d);
     }
     s_next = max + 1;
+    int kept = nvs_next();
+    if (kept > s_next) s_next = kept;
+    if (s_next > 9999) s_next = 1;
     s_ready = true;
 
     uint64_t total, free_bytes;
@@ -141,8 +177,9 @@ esp_err_t storage_format(void)
     }
     mkdir(STORAGE_DCIM, 0775);
     mkdir(STORAGE_THUMBS, 0775);
-    /* File numbers carry on from where they were, so a photo already copied to a phone
-     * never shares a name with a new one. */
+    mkdir(STORAGE_SMALL, 0775);
+    /* File numbers carry on from where they were, here and after a restart (NVS), so a photo
+     * already copied to a phone never shares a name with a new one. */
     ESP_LOGI(TAG, "card formatted");
     return ESP_OK;
 }
@@ -161,6 +198,7 @@ int storage_next_number(void)
 {
     int n = s_next++;
     if (s_next > 9999) s_next = 1;
+    nvs_set_next(s_next);
     return n;
 }
 
@@ -317,6 +355,48 @@ esp_err_t storage_delete(const char *name)
     if (unlink(path) != 0) return ESP_ERR_NOT_FOUND;
     thumb_path(name, path, sizeof(path));
     unlink(path);
+    DIR *d = opendir(STORAGE_SMALL);   /* its small copies, at any size */
+    if (d) {
+        struct dirent *e;
+        while ((e = readdir(d)) != NULL) {
+            if (strncmp(e->d_name, name, 8) != 0 || e->d_name[8] != '_') continue;
+            snprintf(path, sizeof(path), STORAGE_SMALL "/%.40s", e->d_name);
+            unlink(path);
+        }
+        closedir(d);
+    }
+    return ESP_OK;
+}
+
+static bool is_photo(const char *name)
+{
+    bool is_video;
+    return s_ready && parse_name(name, &is_video) >= 0 && !is_video;
+}
+
+FILE *storage_small_open(const char *name, int w, int h, uint32_t *size)
+{
+    if (!is_photo(name)) return NULL;
+    char path[64];
+    small_path(name, w, h, path, sizeof(path));
+    struct stat st;
+    if (stat(path, &st) != 0) return NULL;
+    *size = (uint32_t)st.st_size;
+    return fopen(path, "rb");
+}
+
+esp_err_t storage_small_save(const char *name, int w, int h, const uint8_t *jpg, size_t len)
+{
+    if (!is_photo(name)) return ESP_ERR_INVALID_ARG;
+    if (write_file(SMALL_TMP, jpg, len, false) != ESP_OK) return ESP_FAIL;
+    char path[64];
+    small_path(name, w, h, path, sizeof(path));
+    unlink(path);
+    if (rename(SMALL_TMP, path) != 0) {
+        ESP_LOGE(TAG, "rename to %s failed: %s", path, strerror(errno));
+        unlink(SMALL_TMP);
+        return ESP_FAIL;
+    }
     return ESP_OK;
 }
 

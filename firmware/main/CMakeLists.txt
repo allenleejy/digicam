@@ -1,7 +1,8 @@
 idf_component_register(
-    SRCS "main.c" "lens.c" "storage.c" "avi.c" "link.c" "phone.c"
+    SRCS "main.c" "lens.c" "storage.c" "avi.c" "link.c" "phone.c" "small.c"
          "display.c" "gfx.c" "ui.c" "ui_draw.c" "buttons.c" "battery.c" "font_spleen.c"
     INCLUDE_DIRS "."
+    LDFRAGMENTS "linker.lf"
     REQUIRES esp_driver_uart fatfs sdmmc esp_driver_sdmmc json esp_timer esp_rom
              esp_lcd esp_driver_spi esp_driver_ledc esp_driver_gpio esp_adc nvs_flash
              esp_wifi esp_netif esp_event esp_http_server

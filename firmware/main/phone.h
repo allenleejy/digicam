@@ -5,7 +5,7 @@
 
 /*
  * phone.h: Phone mode. The camera starts its own Wi-Fi network and serves a photo
- * page (web/phone.html) at http://192.168.4.1. An iPhone joins by scanning a QR code
+ * page (web/phone.html) at http://gallery.local, also at http://192.168.4.1. An iPhone joins by scanning a QR code
  * on the camera's screen, browses in Safari and saves photos to Photos: press and hold
  * a photo, or, for many at once, a free Shortcut the page sets up.
  *
@@ -13,7 +13,11 @@
  * and an app on someone else's iPhone needs the paid Apple Developer Program.
  */
 
-#define PHONE_URL "http://192.168.4.1/"
+/* The page's name on the camera's network, by mDNS (PHONE_HOST.local). Every camera can
+ * use the same one: each makes a network of its own. 192.168.4.1 keeps working, for the
+ * DigiGallery frame and for phones that don't look up .local names (Chrome on Android). */
+#define PHONE_HOST "gallery"
+#define PHONE_URL "http://" PHONE_HOST ".local/"
 
 /* Start the Wi-Fi network and the web server. */
 esp_err_t phone_start(const char *ssid, const char *pass, const char *owner);

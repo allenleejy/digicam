@@ -23,7 +23,7 @@ This is a separate project from `../PLAN.md`. That file (July 2026) plans a scre
 | `06-assembly-guide.md` | **Step-by-step assembly with a picture per step**, and the link to the interactive 3D guide (`guide/`) |
 | `05-bench-bring-up.md` | **Start here with the parts on the desk**: wiring every part to the board, testing the whole pipeline step by step, and removing the pin headers for the case |
 | `cad/` | **v3 bodies (23 Oct): `camera1_v3.scad`**, two styles (clear Novo-like and retro rangefinder) for the 2.0 in screen and the camera on the board. Print files in `export/v3/<style>/`, renders in `renders/v3/`, `export_v3.py` rebuilds and runs the fit check `check_v3.py`. Older: v2 (`camera1_v2.scad`, 1.14 in screen), v1 Fusion model |
-| `firmware/` | ESP-IDF camera firmware (0.3.0): runs the camera on its own with screen, buttons and battery gauge; preview, photos, video, gallery, settings, film looks, and Phone mode (its own Wi-Fi and photo page) |
+| `firmware/` | ESP-IDF camera firmware (0.4.3): runs the camera on its own with screen, buttons and battery gauge; preview, photos, video, gallery, settings, film looks, and Phone mode (its own Wi-Fi and photo page) |
 | `host/` | Laptop simulator: a virtual camera in the browser driving the real board. Start with `host/run.sh` ([host/README.md](host/README.md)). `host/bench.py`: screenshots of the camera's screen, button presses, status and log from the terminal |
 | `diagrams/` | `wiring-bench.png` (every wire, pin to pin; from `wiring_bench.py`), `timeline.png` and `wiring.png` (block diagram; still shows the dial), `wiring-early.png` (first sketch, superseded), rendered from the claude.ai doc |
 

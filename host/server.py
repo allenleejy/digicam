@@ -301,6 +301,9 @@ class Handler(BaseHTTPRequestHandler):
 def find_port():
     ports = sorted(glob.glob("/dev/cu.wchusbserial*") + glob.glob("/dev/cu.usbserial*")
                    + glob.glob("/dev/ttyUSB*"))
+    if not ports:   # Windows: COM ports, found by the CH340's USB vendor ID
+        from serial.tools import list_ports
+        ports = sorted(p.device for p in list_ports.comports() if p.vid == 0x1A86)
     return ports[0] if ports else None
 
 

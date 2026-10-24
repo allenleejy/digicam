@@ -30,7 +30,7 @@
 
 1. Allocates three buffers in PSRAM: the outgoing preview frame (256 KB) and two thumbnail buffers (128 KB each).
 2. `link_init`: starts UART0 at 1.5 Mbaud and redirects every `ESP_LOG` message into the link, so log text can't land in the middle of a binary frame.
-3. `storage_init`: mounts the microSD (SDMMC, 1-bit, 40 MHz), creates `DCIM/` and `DCIM/.thumbs/`, deletes any half-written temp files from a power cut, and scans for the highest file number.
+3. `storage_init`: mounts the microSD (SDMMC, 1-bit, 40 MHz), creates `DCIM/` and `DCIM/.thumbs/`, deletes any half-written temp files from a power cut, and sets the next file number: the higher of the card's highest and the one kept in NVS (`next_num`, saved with every new file), so a format and a restart don't start again at 0001. It also creates `DCIM/.small/`, where `/small` keeps the frame's copies.
 4. `lens_init`: starts the OV3660 at full 2048×1536, then drops to the 320×240 preview size (why: section "lens.c" below).
 5. Sends a `boot` event and starts the two tasks.
 

@@ -52,3 +52,15 @@ CONFIG_LWIP_TCP_SND_BUF_DEFAULT=11488
 CONFIG_LWIP_TCP_WND_DEFAULT=16384
 CONFIG_LWIP_TCP_RECVMBOX_SIZE=32
 CONFIG_LWIP_TCPIP_RECVMBOX_SIZE=64
+
+# /small (0.4.1) re-encodes photos with esp32-camera's jpge, whose tables (8 KB) are static:
+# kept in internal RAM they took Phone mode down to 25-29 KB free. This lets fixed
+# variables live in PSRAM: jpge's, by main/linker.lf, and those of lwIP and the Wi-Fi
+# libraries, which ESP-IDF moves on its own when this is on.
+CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y
+
+# gallery.local (0.4.3): mDNS's records, packets and task stack in PSRAM. With them internal
+# it took 7 KB, and Phone mode fell to 17 KB free while the frame's /small was being made
+# during the phone's downloads. Its task only handles packets, never while flash is written.
+CONFIG_MDNS_MEMORY_ALLOC_SPIRAM=y
+CONFIG_MDNS_TASK_CREATE_FROM_SPIRAM=y
