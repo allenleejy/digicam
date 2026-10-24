@@ -566,7 +566,7 @@ portrait_svg = "art/portrait.svg";
 portrait_size = [46.81, 44.0];    // the SVG's page, mm
 portrait_h = 44.0;                // drawn this tall on the covering
 portrait_at = [(lip + 0.4 + cover_x1) / 2, 9.0];   // bottom centre of the page, seen from the back
-ink_depth = 0.6;
+ink_depth = 0.4;   // 5 layers at 0.08 mm: fewer colour swaps for the two-colour print
 module portrait(layer) {
     k = portrait_h / portrait_size[1];
     translate([portrait_at[0] - portrait_size[0] * k / 2, portrait_at[1]]) scale(k) import(portrait_svg, id = layer);
@@ -876,6 +876,11 @@ else if (part == "caps") {
     translate([retro ? 40 : 44, 0, shutter_shaft() + flange]) mirror([0, 0, 1]) shutter_cap();
     translate([60, 0, 0]) knob_cap_part();
 }
+else if (part == "caps_light") {   // caps by colour, for the print plates: ◀ ● ▶ and the shutter...
+    for (i = [0 : 2]) translate([i * 12, 0, 0]) button_cap(i);
+    translate([retro ? 40 : 44, 0, shutter_shaft() + flange]) mirror([0, 0, 1]) shutter_cap();
+}
+else if (part == "knob_cap") knob_cap_part();   // ...and the slide switch's cap
 else if (part == "panel") real() panel();
 else if (part == "bezel") bezel();   // placed flipped, so already the right way round
 else if (part == "lens_ring") lens_ring();

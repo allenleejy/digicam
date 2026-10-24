@@ -30,7 +30,7 @@
 - **Leather grain.** Both coverings have a pebble-grain hide texture: Voronoi pebbles about 1.4 mm across, 0.4 mm deep, with a few long creases. It's a heightmap, `cad/art/leather.png`, made by `cad/art/make_leather.py`, on a 0.8 mm base. A 0.5 mm smooth border runs round each covering.
 - **Portrait on the back covering.** The drawing is `cad/art/portrait.svg` (mm units, three layers), and the model imports it, so **edit the SVG to change the drawing** (Inkscape, Figma, Illustrator), then re-export. `cad/art/portrait_cutout.png` is the photo it was traced from, with the background removed.
   - `figure`: the silhouette, left as smooth leather (no grain), level with the grain's top.
-  - `ink`: the drawing, sunk 0.6 mm into the covering.
+  - `ink`: the drawing, sunk 0.4 mm into the covering (5 layers at 0.08 mm, so few colour swaps).
   - `cut`: lines taken back out of the ink (hair strands, collar, sleeve seams).
   - Keep lines 0.3 mm or wider (0.4 mm safer).
   - Refined 24 Oct. The hair strands follow the photo's hair direction, measured from the picture; the fringe has pointed tufts. Each eye is an almond with the iris where the photo has it (about 0.9 mm across, toward his gaze), 15% larger for legibility. The eyebrows taper from the nose end.
@@ -74,6 +74,24 @@
   - Retro: both in the top plate; the shutter on the right, the switch on the left.
   - Both bodies put a printed cap on the slide switch's knob, glued on with CA: the bare knob doesn't reach the outside.
 - **Board USB-C** on the right side seen from the back (the left side seen from the front), as before.
+
+### Ready-to-print project (retro, Bambu Studio)
+
+Open **`cad/export/v3/retro/camera1_retro_plates.3mf`** in Bambu Studio. It's set up for the **P2S with the 0.4 mm nozzle** and the filaments you have loaded, with one plate per colour so no plate changes colour except the portrait:
+
+| Plate | Parts | Filament | Sliced (Bambu Studio 2.06) |
+| --- | --- | --- | --- |
+| 1 Black | frame, back plate, front plate, sled, button carrier, dial / shoe / collar, switch cap, window inserts | 1: PLA Matte black | 1 h 29 min, 57 g, 0.20 mm |
+| 2 Light | top plate, lens barrel, ◀ ● ▶ caps, shutter | 2: PLA Basic white (swap in silver if you get some) | 31 min, 0.20 mm |
+| 3 Brown coverings | front covering, back covering + portrait inlay | 3: PLA Wood brown, inlay in 1: black (AMS) | 1 h 12 min, 0.08 mm layers for the grain, 6 colour swaps |
+
+- **Settings:** Bambu's "0.20mm Standard @BBL P2S" with 3 walls and no supports; the coverings override the layer height to 0.08 mm.
+- **PLA, not PETG:** these are the filaments you have loaded. That's fine for a camera that stays out of hot cars. Set the iron to about 200 °C for the heat-set inserts, not the 230 °C given for PETG.
+![The three plates](cad/renders/v3/retro_plates.png)
+
+- **Before slicing:** click **Sync with AMS** (or check each filament slot matches the table).
+- **No AMS:** on plate 3, delete the "portrait inlay" part of the back covering, and paint-fill the sunk drawing instead.
+- **Rebuild:** after any model change, run `python3 cad/export_v3.py` and then `python3 cad/make_plates_v3.py`. The second script packs the plates and reads the print settings from Bambu Studio's own presets.
 
 ### Parts, how to print them, and colour ideas
 
