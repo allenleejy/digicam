@@ -57,8 +57,8 @@ module part_named(n) {
     if (n == "top_plate" && retro) top_plate();
     if (n == "top_bits" && retro) top_bits_placed();
     // plain panels here: the grain is too many triangles for the page
-    if (n == "covering_front" && retro) translate([0, 0, D]) linear_extrude(1.0) leatherette_2d();
-    if (n == "covering_back" && retro) translate([0, 0, -1.0]) linear_extrude(1.0) back_leatherette_2d();
+    if (n == "covering_front" && retro) translate([0, 0, D]) linear_extrude(bump) leatherette_2d();
+    if (n == "covering_back" && retro) translate([0, 0, -bump]) linear_extrude(bump) back_leatherette_2d();
     if (n == "windows" && retro) for (w = tp_wins)
         if (w[4] == "front") zbox(w[0] + 0.15, H + w[1] + 0.15, w[2] - 0.3, w[3] - 0.3, D + 1.2 - 0.8 + 0.02, D + 1.2 - 0.02);
         else zbox(w[0] + 0.15, H + w[1] + 0.15, w[2] - 0.3, w[3] - 0.3, 0.02, 0.78);

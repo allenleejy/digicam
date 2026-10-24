@@ -210,8 +210,9 @@ The electronics are now one connected bundle. Each step below puts one part of i
 1. **Caps:** from the inside, drop the three button caps into their sleeves.
    - The ◀ and ▶ caps have a small key rib. Line it up with the slot in the sleeve; then the arrows can't turn.
    - The caps' flanges rest on the sleeves.
-2. **Switches:** press each switch into its pocket in the carrier, **plunger toward the caps**, with its wires through the slots. The pockets are snug.
-   - If one feels loose, a drop of CA on two corners holds it.
+2. **Switches:** push each switch into its pocket in the carrier, **plunger toward the caps**, with its wires through the slots, until the two fingers click over its metal top.
+   - The carrier, switches and wires are now one piece: solder and test them before fitting.
+   - If the fingers don't catch (your switch body is shorter than 3.5 mm), a drop of CA on two corners holds it.
 3. **Carrier:** lay it on the two posts and fit the 2 screws, M2 × 6 or × 5, straight into the plastic. Stop when snug.
 4. **Check:** press each cap from the outside. Each should click once, with no wobble.
 
@@ -303,7 +304,8 @@ The electronics are now one connected bundle. Each step below puts one part of i
 - **Clear:**
   1. Press the battery panel into its opening in the back plate from outside, onto the ledge, with 4 dots of CA or thin tape.
   2. Stick the screen bezel onto the back with thin double-sided tape, so the caps come through its holes and the screen shows through its window.
-- **Retro:** stick on the front and back coverings with thin double-sided tape. They're cut around the screws, so the camera still opens.
+- **Retro:** stick on the front and back coverings with thin double-sided tape. The front one drops into the rim. They're cut around the screws, so the camera still opens.
+  - One-colour print: before fitting the back covering, fill the sunk portrait with dark acrylic paint and wipe the face clean with a damp cloth.
 
 ---
 

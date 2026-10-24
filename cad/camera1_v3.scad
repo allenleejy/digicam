@@ -14,6 +14,12 @@
 //     plate; each cap has its own guide sleeve and a recessed dish on the back
 //   - the charge module sits in front of the battery, USB-C out of the left side
 //
+// 24 Oct (retro): the front plate now sits inside a rim standing 1.2 mm proud of it, so the
+// front covering is flush; the rim, the back plate's outer edge and the top plate share one
+// rounded edge profile and the body's top corners are square, so the sides run straight on
+// into the top plate. The coverings have a leather grain (art/leather.png); the back one carries
+// a portrait drawn in art/portrait.svg (edit the SVG, re-export). The switches snap into the carrier.
+//
 // Construction (both styles): a frame (the sides) between a back plate and a front plate,
 // M2 screws into heat-set inserts. The board and screen stack on a sled that drops in on
 // three screws. Everything prints flat without supports; see 04-case-design.md (v3).
@@ -63,6 +69,7 @@ chg_usb_z = 2.6;        // USB-C socket centre above the module's back face: MEA
 btn = 5.0;              // tactile switch, flat feet
 btn_h = 6.0;            // base to top of the plunger
 btn_feet = 7.6;         // feet, tip to tip: MEASURE
+btn_body = 3.5;         // base to the switch's metal top (the snap fingers catch this edge): MEASURE
 
 sw = [8.6, 3.6, 3.6];   // slide switch body: length (slide direction), height (knob side), width
 sw_knob = [2.0, 1.5, 1.5];
@@ -77,10 +84,19 @@ clr = 0.3;
 t_back = 2.0;
 t_front = retro ? 2.4 : 2.0;
 tp_h = 10.2;            // retro top plate height: ceiling, sleeve, flange, switch on the frame top
-bump = retro ? 0 : 0.9; // clear: the rim stands this far proud of both plates
-lip = 1.4;              // clear: width of the rim beside the plates
+bump = retro ? 1.2 : 0.9;   // the rim stands this far proud of the plates (retro: the front only, by the covering's thickness)
+lip = retro ? 2.2 : 1.4;    // width of the rim beside the plates
 bezel_t = 1.2;          // clear: raised bezel round the screen and buttons
-face_z = retro ? 0 : -bezel_t;   // the back surface the button caps sit in
+face_z = retro ? 0 : -bezel_t;      // the back surface the button caps sit in
+// edge profile: [inset, distance from the face] from the side wall to the face.
+// Retro: a 2 mm fillet on the front (the rim, the top plate); on the back (the back plate's edge,
+// the top plate) the fillet turns into a 45 degree chamfer halfway round, so the back plate
+// prints face down without support. Clear: the rim's 1 mm chamfer both sides.
+edge_r = 2.0;
+function fillet_pts(r, n = 8) = [for (i = [0 : n]) let(a = 90 * i / n) [r - r * cos(a), r - r * sin(a)]];
+function teardrop_pts(r, n = 4) = concat([for (i = [0 : n]) let(a = 45 * i / n) [r - r * cos(a), r - r * sin(a)]], [[2 * r * (1 - cos(45)), 0]]);
+edge_back = retro ? teardrop_pts(edge_r) : [[0, 1.0], [1.0, 0]];
+edge_front = retro ? fillet_pts(edge_r) : [[0, 1.0], [1.0, 0]];
 
 // depth: back plate | screen | sled | board | ESP32 module | camera | front plate
 z_bi = t_back;                                    // inside face of the back plate
@@ -99,7 +115,7 @@ z_fi = max(z_lens + lens_recess - t_front,        // lens just behind the front 
 cav = z_fi - z_bi;
 D = z_fi + t_front;
 z_mid = z_bi + cav / 2;
-echo(str("STYLE ", style, ": BODY ", W, " x ", H + (retro ? tp_h : 0), " x ", D, " mm, cavity ", cav));
+echo(str("STYLE ", style, ": BODY ", W, " x ", H + (retro ? tp_h : 0), " x ", D + (retro ? 1 : 2) * bump, " mm (plates ", D, "), cavity ", cav));
 
 // ================================================================ layout, seen from the back
 post_in = 5.8;
@@ -162,8 +178,24 @@ tp_screws = [div_x + 3.0, W - 7.0];
 
 // ================================================================ helpers
 module rrect(w, h, r) { offset(r) offset(-r) square([w, h]); }
-module outline() { rrect(W, H, R); }
-module plate_outline() { if (retro) outline(); else offset(-lip - 0.2) outline(); }
+// retro: square top corners, so the sides run straight on into the top plate
+module outline() { if (retro) hull() { for (x = [R, W - R]) translate([x, R]) circle(R); translate([0, H - 1]) square([W, 1]); } else rrect(W, H, R); }
+module plate_outline() { offset(-lip - 0.2) outline(); }   // a plate inside the rim's rebate
+// a convex 2D shape grown into a solid from z0 to z1 with edge profiles on its two faces
+square_edge = [[0, 0]];
+module profiled(z0, z1, back = edge_back, front = edge_front) {
+    hull() {
+        for (p = back) translate([0, 0, z0 + p[1]]) linear_extrude(0.01) offset(-p[0]) children();
+        for (p = front) translate([0, 0, z1 - p[1] - 0.01]) linear_extrude(0.01) offset(-p[0]) children();
+    }
+}
+// retro: the outline run on above H and cut there, so a profiled body keeps a square top edge
+module retro_body(z0, z1, back, front) {
+    intersection() {
+        profiled(z0, z1, back, front) hull() { outline(); translate([0, H - 1]) square([W, 11]); }
+        translate([-1, -1, z0 - 1]) cube([W + 2, H + 1, z1 - z0 + 2]);
+    }
+}
 module stadium(sz) { hull() for (s = [-1, 1]) translate([s * (sz[0] - sz[1]) / 2, 0]) circle(d = sz[1]); }
 module box(p, s) { translate(p) cube(s); }
 module zbox(x, y, w, h, z0, z1) { box([x, y, z0], [w, h, z1 - z0]); }
@@ -173,8 +205,7 @@ module zcyl(c, d, z0, z1) { translate([c[0], c[1], z0]) cylinder(d = d, h = z1 -
 module frame() {
     difference() {
         union() {
-            if (retro) translate([0, 0, z_bi]) linear_extrude(cav) difference() { outline(); offset(-wall) outline(); }
-            else rim();
+            rim();
             for (p = posts) zcyl(p, 2 * post_r, z_bi, z_fi);
             // battery: divider, a stop above it (gaps for its leads), two fingers on the left
             zbox(div_x, wall - 0.5, 1.2, bat_xy[1] + bat[1] - wall + 0.5, z_bi, z_fi);
@@ -233,15 +264,13 @@ module frame() {
     if (retro) for (s = [-1, 1]) strap_lug(s, H - 9);
     else strap_lug(-1, H - 15);
 }
-// clear: the rim. Chamfered all round, standing proud of both plates, with a rebate each face
+// the rim: the edge profile all round, standing proud of the plates, with a rebate for each.
+// Retro: front only (the back plate covers the frame's back edge, so the frame prints on it with
+// everything inside standing on the bed), and the top edge square, so the top plate carries on.
 module rim() {
-    c = 1.0;
     difference() {
-        hull() {
-            translate([0, 0, -bump]) linear_extrude(0.01) offset(-c) outline();
-            translate([0, 0, -bump + c]) linear_extrude(D + 2 * bump - 2 * c) outline();
-            translate([0, 0, D + bump - 0.01]) linear_extrude(0.01) offset(-c) outline();
-        }
+        if (retro) retro_body(z_bi, D + bump, square_edge, edge_front);
+        else profiled(-bump, D + bump) outline();
         translate([0, 0, z_bi - 0.01]) linear_extrude(cav + 0.02) offset(-wall) outline();
         translate([0, 0, -bump - 1]) linear_extrude(z_bi + bump + 1) offset(-lip) outline();
         translate([0, 0, z_fi]) linear_extrude(t_front + bump + 1) offset(-lip) outline();
@@ -306,7 +335,8 @@ module sled_2d() {
 module back_plate() {
     difference() {
         union() {
-            linear_extrude(t_back) plate_outline();
+            if (retro) retro_body(0, t_back, edge_back, square_edge);
+            else linear_extrude(t_back) plate_outline();
             // guide sleeves for the button caps, and the posts the carrier screws to
             for (i = [0 : 2]) {
                 zcyl([btn_xs[i], btn_y], cap_ds[i] + 0.4 + 2 * sleeve[1], t_back - 0.01, z_flange0);
@@ -368,18 +398,39 @@ module bezel() {   // outer face on top (z = bezel_t), as printed
 }
 
 // ================================================================ button carrier (printed floor down)
-// The three switches drop into its pockets, plungers toward the back plate; their wires leave
-// through the slots. It screws to the two posts on the back plate (M2 x 6, self-tapping).
+// The three switches SNAP into its pockets, plungers toward the back plate: two flexible fingers
+// per pocket click over the edge of the switch's metal top, so the carrier, switches and their
+// wires make one piece you can solder and test before it goes in. Their wires leave through the
+// slots. The carrier then screws to the two posts on the back plate (M2 x 6, self-tapping), which
+// sets the switches 0.1 mm behind the caps' flanges.
+snap_reach = clr + 0.35;   // how far each finger's catch reaches in from the pocket wall (0.35 mm over the switch)
+snap_w = 3.0;              // finger width
+snap_t = 0.9;              // finger thickness
+z_snap = z_btn_base - btn_body - 0.05;   // the catch face, just past the switch's top
 module carrier() {
     difference() {
         union() {
             zbox(carrier_xy[0], carrier_xy[1], carrier_sz[0], carrier_sz[1], z_btn_base, z_btn_base + carrier_t);
             for (x = btn_xs) zbox(x - btn / 2 - clr - 1.2, btn_y - btn / 2 - clr - 1.2, btn + 2 * clr + 2.4, btn + 2 * clr + 2.4,
                                   z_btn_base - carrier_wall, z_btn_base + 0.01);
+            // snap fingers on the two walls without feet: run on past the switch's top, a catch with a lead-in
+            for (x = btn_xs, s = [-1, 1]) let(yi = btn_y + s * (btn / 2 + clr)) {
+                zbox(x - snap_w / 2, s < 0 ? yi - snap_t : yi, snap_w, snap_t, z_snap - 0.7, z_btn_base - carrier_wall + 0.01);
+                hull() {
+                    zbox(x - snap_w / 2, s < 0 ? yi - 0.01 : yi - snap_reach, snap_w, snap_reach + 0.01, z_snap - 0.01, z_snap);
+                    zbox(x - snap_w / 2, s < 0 ? yi - 0.01 : yi - 0.01, snap_w, 0.02, z_snap - 0.7, z_snap - 0.69);
+                }
+            }
         }
+        // slits either side of each finger, down to the floor, so it can flex
+        for (x = btn_xs, s = [-1, 1], dx = [-1, 1]) let(yi = btn_y + s * (btn / 2 + clr))
+            zbox(x + dx * (snap_w / 2 + 0.25) - 0.25, s < 0 ? yi - 1.3 : yi - 0.1, 0.5, 1.4, z_snap - 1, z_btn_base + 0.01);
+        // the finger is thinner than the wall
+        for (x = btn_xs, s = [-1, 1]) let(yi = btn_y + s * (btn / 2 + clr))
+            zbox(x - snap_w / 2, s < 0 ? yi - 1.3 : yi + snap_t, snap_w, 1.3 - snap_t, z_snap - 1, z_btn_base + 0.01);
         for (x = btn_xs) {
             // the switch body, and its feet out to each side
-            zbox(x - btn / 2 - clr, btn_y - btn / 2 - clr, btn + 2 * clr, btn + 2 * clr, z_btn_base - carrier_wall - 1, z_btn_base + 0.01);
+            zbox(x - btn / 2 - clr, btn_y - btn / 2 - clr, btn + 2 * clr, btn + 2 * clr, z_snap, z_btn_base + 0.01);   // stops at the catches
             zbox(x - btn_feet / 2 - clr, btn_y - 1.6, btn_feet + 2 * clr, 3.2, z_btn_base - 1.2, z_btn_base + 0.01);
             // wires out through the floor, beside the feet
             for (s = [-1, 1]) zbox(x + s * (btn_feet / 2 - 0.6) - 1.2, btn_y - 1.6 - 1.4, 2.4, 1.4, z_btn_base - 1, z_btn_base + carrier_t + 1);
@@ -485,30 +536,63 @@ module knurl(d, h, n) {
     cylinder(d = d - 1.6, h = h);
 }
 
-// leatherette: one textured panel over the front plate, cut around the barrel and screw heads
+// leatherette: one textured panel over the front plate, inside the rim, cut around the barrel and screw heads
+cover_t = 0.8;              // the coverings' base; the grain stands on it up to bump (front: level with the rim)
+grain_t = bump - cover_t;
+tex_px = 0.2;               // mm per pixel of the grain heightmap (art/leather.png, from art/make_leather.py)
+cover_x1 = win_xy[0] - 4.2; // right edge of the back covering, seen from the back
 module leatherette_2d() {
     difference() {
-        offset(-1.2) outline();
+        offset(-lip - 0.4) outline();
         translate(lens_c) circle(d = barrel_d + 1.0);
         for (p = posts) translate(p) circle(r = 3.0);
         translate([chg_xy[0] + chg[0] - 4, chg_xy[1] + chg[1] / 2]) circle(d = 2.6);
     }
 }
 module leatherette() { grain() leatherette_2d(); }
-// the back's covering: the part left of the screen and buttons
+// the back's covering: the part left of the screen and buttons, in a pocket in the back plate
 module back_leatherette_2d() {
     difference() {
-        intersection() { offset(-1.2) outline(); square([win_xy[0] - 4.2, H]); }
+        intersection() { offset(-lip - 0.4) outline(); square([cover_x1, H]); }
         for (p = posts) translate(p) circle(r = 3.0);
     }
 }
-module back_leatherette() { grain() back_leatherette_2d(); }
-// a flat panel with pebbled grain (small raised diamonds) on top, clipped to its outline
-module grain() {
-    linear_extrude(0.8) children();
-    translate([0, 0, 0.79]) linear_extrude(0.4) intersection() {
-        offset(-0.6) children();
-        for (i = [0 : 2 : W], j = [0 : 2 : H]) translate([i + (j % 4 == 0 ? 0 : 1), j]) rotate(45) square(1.1, center = true);
+// The portrait on the back covering, drawn in art/portrait.svg (mm). Its layers:
+//   figure  the person's silhouette: smooth leather, level with the top of the grain
+//   ink     the drawing, sunk ink_depth into the covering (paint it, or print portrait_inlay.stl
+//           in a second colour so it comes out flush)
+//   cut     lines taken back out of the ink (hair strands, collar, seams)
+portrait_svg = "art/portrait.svg";
+portrait_size = [46.81, 44.0];    // the SVG's page, mm
+portrait_h = 44.0;                // drawn this tall on the covering
+portrait_at = [(lip + 0.4 + cover_x1) / 2, 9.0];   // bottom centre of the page, seen from the back
+ink_depth = 0.6;
+module portrait(layer) {
+    k = portrait_h / portrait_size[1];
+    translate([portrait_at[0] - portrait_size[0] * k / 2, portrait_at[1]]) scale(k) import(portrait_svg, id = layer);
+}
+module portrait_ink() intersection() { difference() { portrait("ink"); portrait("cut"); } offset(-0.3) back_leatherette_2d(); }
+module portrait_figure() intersection() { union() { portrait("figure"); portrait("ink"); } back_leatherette_2d(); }
+module back_leatherette() {
+    difference() {
+        union() {
+            linear_extrude(cover_t) back_leatherette_2d();
+            difference() {
+                grain_relief() back_leatherette_2d();
+                translate([0, 0, cover_t - 1]) linear_extrude(2) offset(0.4) portrait_figure();
+            }
+            linear_extrude(bump) portrait_figure();
+        }
+        translate([0, 0, bump - ink_depth]) linear_extrude(1) portrait_ink();
+    }
+}
+module portrait_inlay() translate([0, 0, bump - ink_depth]) linear_extrude(ink_depth) portrait_ink();
+// a flat panel with leather grain on top, clipped to its outline (a smooth 0.5 mm border all round)
+module grain() { linear_extrude(cover_t) children(); grain_relief() children(); }
+module grain_relief() {
+    intersection() {
+        translate([0, 0, cover_t - 0.01]) linear_extrude(grain_t + 0.02) offset(-0.5) children();
+        translate([0, 0, cover_t]) scale([tex_px, tex_px, grain_t / 100]) surface(file = "art/leather.png");
     }
 }
 
@@ -521,22 +605,43 @@ module window_inserts() {
 // top plate: a hollow cap on the frame's top wall, holding the shutter and the power switch.
 // Prints upside down (its top on the bed); the dial, shoe and knob are separate small parts.
 tp_ceiling = 2.0;
-module top_plate_2d() { offset(r = 3) offset(delta = -3) square([W, D + 1.2]); }   // front flush with the covering
+// seen from the front: the body's sides carried on up, top corners rounded. It gets the body's
+// edge profiles, and runs from the back plate's face to the rim's front (flush with the front covering).
+// The top face prints on the bed, so every edge that meets it turns into a 45 degree chamfer at
+// the bed: the top corners (seen from the front) are rounded up to 45 degrees and then chamfered,
+// and the front and back top edges are filled out under their profile by top_plate_foot.
+tp_r = R + 1;
+tp_chamfer = 2 * edge_r * (1 - cos(45));   // where the profile's 45 degree tangent meets the top face
+function td_arc(cx, cy, r, s) = [for (a = [0 : 7.5 : 45]) [cx + s * r * cos(a), cy + r * sin(a)]];
+module top_plate_2d() {
+    yt = H + tp_h;
+    polygon(concat([[0, H - 10], [W, H - 10]],
+        td_arc(W - tp_r, yt - tp_r, tp_r, 1), [[W - tp_r + 0.414 * tp_r, yt]],
+        [[tp_r - 0.414 * tp_r, yt]], [for (p = [6 : -1 : 0]) td_arc(tp_r, yt - tp_r, tp_r, -1)[p]]));
+}
+// the body's section front to back (X across, Z): the edge profiles at its four corners
+function xz_section(z1) = concat(
+    [for (p = edge_back) [p[0], p[1]]], [for (i = [len(edge_back) - 1 : -1 : 0]) [W - edge_back[i][0], edge_back[i][1]]],
+    [for (p = edge_front) [W - p[0], z1 - p[1]]], [for (i = [len(edge_front) - 1 : -1 : 0]) [edge_front[i][0], z1 - edge_front[i][1]]]);
+module top_plate_foot() {   // the top face as printed: in from the front and back by tp_chamfer, and from the ends to the corners' chamfers
+    translate([0, H + tp_h, 0]) rotate([90, 0, 0]) linear_extrude(0.01) intersection() {
+        offset(delta = -tp_chamfer) polygon(xz_section(D + bump));
+        translate([tp_r * (1 - 0.414), -1]) square([W - 2 * tp_r * (1 - 0.414), D + bump + 2]);
+    }
+}
 module top_plate() {
     y0 = H;
     y1 = H + tp_h;
-    intersection() {
-        top_plate_body(y0, y1);
-        translate([0, y0 - 10, -1]) linear_extrude(D + 4) rrect(W, tp_h + 10, R + 1);   // round the top corners
-    }
-}
-module top_plate_body(y0, y1) {
     difference() {
         union() {
-            // shell: walls and ceiling (2D outline is X across, Z front-back)
-            translate([0, y1, 0]) rotate([90, 0, 0]) difference() {
-                linear_extrude(tp_h) top_plate_2d();
-                translate([0, 0, tp_ceiling]) linear_extrude(tp_h) offset(-2.0) top_plate_2d();
+            // shell: walls and ceiling
+            difference() {
+                intersection() {
+                    hull() { profiled(0, D + bump) top_plate_2d(); top_plate_foot(); }
+                    translate([-1, y0, -1]) cube([W + 2, tp_h + 1, D + bump + 2]);
+                }
+                translate([0, 0, 2.0]) linear_extrude(D + bump - 4.0)
+                    intersection() { offset(-2.0) top_plate_2d(); translate([0, y0 - 11]) square([W, tp_h + 11 - tp_ceiling]); }
             }
             // shutter: guide sleeve under the ceiling, and a cradle the switch sits in
             translate([shutter_x, y1 - tp_ceiling + 0.01, z_mid]) rotate([90, 0, 0]) cylinder(d = shutter_d + 0.4 + 2.4, h = 1.0);
@@ -558,8 +663,8 @@ module top_plate_body(y0, y1) {
         }
         // front: viewfinder and rangefinder windows (recesses for dark inserts or paint)
         win_depth = 0.8;
-        for (w = tp_wins) if (w[4] == "front") zbox(w[0], y0 + w[1], w[2], w[3], D + 1.2 - win_depth, D + 3);
-                          else zbox(w[0], y0 + w[1], w[2], w[3], -1, win_depth);
+        for (w = tp_wins) if (w[4] == "front") zbox(w[0], y0 + w[1], w[2], w[3], D + bump - win_depth, D + bump + 2);
+                          else zbox(w[0], y0 + w[1], w[2], w[3], -2, win_depth);
         // holes for the decorations
         translate([W / 2 + 2, y1 + 1, z_mid]) rotate([90, 0, 0]) cylinder(d = 3.0, h = tp_ceiling + 2);      // shoe peg
         translate([shutter_x - 15, y1 + 1, z_mid]) rotate([90, 0, 0]) cylinder(d = 3.0, h = tp_ceiling + 2);  // dial peg
@@ -600,9 +705,9 @@ module ghost(name) {
     if (name == "screen") zbox(scr_xy[0] + e, scr_xy[1] + e, scr[0] - 2 * e, scr[1] - 2 * e, z_bi + e, z_bi + scr_t);
     if (name == "charger") zbox(chg_xy[0] + e, chg_xy[1] + e, chg[0] - 2 * e, chg[1] - 2 * e, z_chg0, z_chg0 + chg_t);
     if (name == "buttons") for (x = btn_xs) {
-        zbox(x - btn / 2 + e, btn_y - btn / 2 + e, btn - 2 * e, btn - 2 * e, z_btn_base - 3.5, z_btn_base - e);
+        zbox(x - btn / 2 + e, btn_y - btn / 2 + e, btn - 2 * e, btn - 2 * e, z_btn_base - btn_body, z_btn_base - e);
         zbox(x - btn_feet / 2 + e, btn_y - 1.5, btn_feet - 2 * e, 3, z_btn_base - 0.6, z_btn_base - e);
-        translate([x, btn_y, z_plunger + e]) cylinder(d = 2.5, h = btn_h - 3.5 - e);
+        translate([x, btn_y, z_plunger + e]) cylinder(d = 2.5, h = btn_h - btn_body - e);
     }
     if (name == "shutter") {
         yb = retro ? H + 0.01 : shutter_base();
@@ -636,6 +741,8 @@ inner_col = "#f2efe8";
 accent = "#ff8a3d";
 silver = "#d8d6d0";
 leather_col = "#7a4a2e";
+inlay_col = "#2a1a12";      // the portrait inlay, if printed in a second colour (dark, like branded leather)
+inlay_shown = true;
 clear_solid = false;
 module clear_part() { if (clear_solid) color([0.75, 0.88, 1.0, 0.3]) children(); else %children(); }
 
@@ -644,9 +751,12 @@ module assembly(gap = 0) {
         translate([0, 0, -gap]) color(body_col) back_plate();
         translate([0, 0, z_fi + gap]) color(body_col) front_plate();
         translate([0, 0, D + 1.5 * gap]) color(leather_col) leatherette();
-        translate([0, 0, -1.5 * gap]) mirror([0, 0, 1]) color(leather_col) back_leatherette();
+        translate([0, 0, -1.5 * gap]) mirror([0, 0, 1]) {
+            color(leather_col) back_leatherette();
+            if (inlay_shown) color(inlay_col) portrait_inlay();
+        }
         translate([0, gap, 0]) color("#1c1b20") for (w = tp_wins)
-            if (w[4] == "front") zbox(w[0] + 0.15, H + w[1] + 0.15, w[2] - 0.3, w[3] - 0.3, D + 1.2 - 0.8 + 0.02, D + 1.2 - 0.02);
+            if (w[4] == "front") zbox(w[0] + 0.15, H + w[1] + 0.15, w[2] - 0.3, w[3] - 0.3, D + bump - 0.8 + 0.02, D + bump - 0.02);
             else zbox(w[0] + 0.15, H + w[1] + 0.15, w[2] - 0.3, w[3] - 0.3, 0.02, 0.78);
         translate([lens_c[0], lens_c[1], D + 2.2 * gap]) color(silver) lens_barrel();
         translate([0, gap, 0]) color(silver) top_plate();
@@ -772,9 +882,15 @@ else if (part == "lens_ring") lens_ring();
 else if (part == "lens_barrel") lens_barrel();
 else if (part == "leatherette") real() leatherette();
 else if (part == "back_leatherette") back_leatherette();   // back covering: its own outline is already the right way round
+else if (part == "portrait_inlay") portrait_inlay();       // load with back_leatherette.3mf as one object, two parts
+else if (part == "portrait_flat") { color(leather_col) linear_extrude(0.01) back_leatherette_2d(); color("#f0e6d0") translate([0, 0, 0.02]) linear_extrude(0.01) portrait_figure(); color("#2a1a10") translate([0, 0, 0.04]) linear_extrude(0.01) portrait_ink(); }
 else if (part == "window_inserts") window_inserts();
 else if (part == "top_plate") real() rotate([-90, 0, 0]) translate([0, -H - tp_h, 0]) top_plate();
-else if (part == "top_bits") { dial(); translate([20, 0, 0]) shoe(); translate([40, 0, 0]) shutter_collar(); }
+else if (part == "top_bits") {   // dial and shoe upside down (peg up), so neither hangs over its thin peg
+    translate([0, 0, 5.8]) mirror([0, 0, 1]) dial();
+    translate([20, 0, 4.4]) mirror([0, 0, 1]) shoe();
+    translate([40, 0, 0]) shutter_collar();
+}
 else if (part == "guide") guide();
 else if (part == "coords") {   // positions for the wiring diagrams (wiring_v3.py), seen from the back
     echo(str("COORDS {", "\"W\":", W, ",\"H\":", H, ",\"wall\":", wall, ",\"R\":", R,

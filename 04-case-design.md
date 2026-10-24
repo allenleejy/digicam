@@ -14,10 +14,41 @@
 | | Clear | Retro |
 | --- | --- | --- |
 | Look | InstantSnap Novo-like (restyled 23 Oct from your reference picture): a frosted tinted shell with a chamfered rim standing 0.9 mm proud of both faces, a raised bezel round the screen and buttons, a separate panel over the battery, an orange pill shutter and the power switch on the top left, a strap loop on the left side | Rangefinder: textured covering front and back, a separate top plate with shutter, dial and accessory shoe, a knurled lens barrel, strap lugs |
-| Size | 112 × 68 × 22.3 mm with the rim (20.5 mm plates) | 112 × 68.2 × 20.9 mm (lens barrel adds 6 mm, lugs 3 mm each side) |
-| Parts to print | 9 | 12 |
+| Size | 112 × 68 × 22.3 mm with the rim (20.5 mm plates) | 112 × 68.2 × 22.1 mm to the front rim, 23.3 mm over the back covering (lens barrel adds 6 mm, lugs 3 mm each side) |
+| Parts to print | 9 | 13 (14 with the two-colour portrait inlay) |
 
 **Step-by-step assembly, wiring diagrams and wire lengths: `11-assembly-guide-v3.md`.**
+
+### Retro update, 24 Oct: edges, leather, portrait, snap-in switches
+
+![Retro back](cad/renders/v3/retro_back.png)
+
+- **Top plate joint.** Before, the top plate's ends were rounded front to back (r 3) while the body below had square edges and rounded top corners, so the silver curved in where it met the body. Now:
+  - the body's top corners are square, so its sides run straight up into the top plate;
+  - the body and the top plate share one edge profile: a 2 mm fillet on the front, and on the back a 2 mm fillet that turns into a 45° chamfer (so the back plate prints face down without support);
+  - the front plate now sits inside a rim on the frame that stands 1.2 mm proud of it, so the front covering is flush with the rim and with the top plate's front.
+- **Leather grain.** Both coverings have a pebble-grain hide texture: Voronoi pebbles about 1.4 mm across, 0.4 mm deep, with a few long creases. It's a heightmap, `cad/art/leather.png`, made by `cad/art/make_leather.py`, on a 0.8 mm base. A 0.5 mm smooth border runs round each covering.
+- **Portrait on the back covering.** The drawing is `cad/art/portrait.svg` (mm units, three layers), and the model imports it, so **edit the SVG to change the drawing** (Inkscape, Figma, Illustrator), then re-export. `cad/art/portrait_cutout.png` is the photo it was traced from, with the background removed.
+  - `figure`: the silhouette, left as smooth leather (no grain), level with the grain's top.
+  - `ink`: the drawing, sunk 0.6 mm into the covering.
+  - `cut`: lines taken back out of the ink (hair strands, collar, sleeve seams).
+  - Keep lines 0.3 mm or wider (0.4 mm safer).
+  - Refined 24 Oct. The hair strands follow the photo's hair direction, measured from the picture; the fringe has pointed tufts. Each eye is an almond with the iris where the photo has it (about 0.9 mm across, toward his gaze), 15% larger for legibility. The eyebrows taper from the nose end.
+  - Size and place: `portrait_h` and `portrait_at` in `camera1_v3.scad`.
+- **Two ways to print the portrait:**
+  1. **Two colours (AMS):** add `portrait_inlay.3mf` to `back_leatherette.3mf` as a part of the same object (Bambu Studio: right-click the covering → Add part → Load), and give the inlay a dark colour. The inlay fills the sunk drawing exactly, so it comes out flush.
+  2. **One colour:** print the covering alone. Fill the sunk drawing with dark acrylic paint and wipe the face clean.
+- **Switches snap into the carrier.** Each pocket has two flexible fingers, 3 mm wide and 0.9 mm thick, with slits beside them. Their catches click 0.35 mm over the edge of the switch's metal top, and a lead-in chamfer helps them on. So the carrier, the three switches and their wires are one piece you can solder and test before it goes in; then the carrier screws to the back plate's two posts as before. The catch height assumes the switch body is 3.5 mm from its base to its metal top (`btn_body`): **measure one**.
+- **Printing fixes found on the way:**
+  - the top plate's edges at the bed now end in 45° chamfers;
+  - the dial and accessory shoe are exported upside down (peg up), so neither hangs over its thin peg;
+  - the coverings are 3MF files: a clean mesh, about 6 MB each.
+![Top plate joint, before and after](cad/renders/v3/retro_joint_before_after.png)
+![Portrait, one colour and two colours](cad/renders/v3/retro_portrait.png)
+![Portrait against the photo, before and after the 24 Oct refinement](cad/renders/v3/retro_portrait_compare.png)
+![Switch snap fit, section](cad/renders/v3/carrier_snap_section.png)
+
+- **Checks:** `check_v3.py` now measures each overlap's volume, so parts that only touch don't count. 256 pairs, none overlap.
 
 ![Clear](cad/renders/v3/clear_back.png)
 ![Retro](cad/renders/v3/retro_front.png)
@@ -48,6 +79,8 @@
 
 Everything prints flat without supports at 0.2 mm layers with 3 walls. The STLs are already in the right orientation.
 
+**Clear frame (found 24 Oct, not fixed yet):** its corner posts, battery divider and sled blocks start on top of the back plate's recess, so they hang 2.9 mm above the bed. Turn on supports from the build plate only for that part. The retro frame doesn't have this problem.
+
 | Part | File | Print | Clear: colour | Retro: colour |
 | --- | --- | --- | --- | --- |
 | Frame (the sides) | `frame.stl` | Standing on its back edge | Translucent mint PETG | Black |
@@ -60,15 +93,16 @@ Everything prints flat without supports at 0.2 mm layers with 3 walls. The STLs 
 | Battery panel (clear) | `panel.stl` | Flat | Frosted white or mint | |
 | Screen bezel (clear) | `bezel.stl` | Flat, outer face up | Frosted white or mint | |
 | Top plate (retro) | `top_plate.stl` | Upside down, top on the bed | | Silver or cream |
-| Dial, accessory shoe, shutter collar | `top_bits.stl` | As exported | | Black |
+| Dial, accessory shoe, shutter collar | `top_bits.stl` | As exported (dial and shoe upside down, peg up) | | Black |
 | Lens barrel | `lens_barrel.stl` | Back face down | | Silver |
-| Front covering | `leatherette.stl` | Flat, grain up | | Brown or tan |
-| Back covering | `back_leatherette.stl` | Flat, grain up | | Same as the front |
+| Front covering | `leatherette.3mf` | Flat, grain up; 0.1–0.12 mm layers bring out the grain | | Brown or tan |
+| Back covering, with the portrait | `back_leatherette.3mf` | Same | | Same as the front |
+| Portrait inlay (two-colour print only) | `portrait_inlay.3mf` | A part of the back covering's object, not on its own | | Dark brown or black |
 | Window inserts (viewfinder, rangefinder, eyepiece) | `window_inserts.stl` | Flat | | Black or dark grey |
 
 **Glass-clear plates:** for the clear style, the plates can instead be laser-cut from 2 mm acrylic using `clear/*_lasercut.dxf`. They then lose the button sleeves, the carrier posts, the screen lip, the camera collar and the charger rim, so use the printed plates for the first build.
 
-**Retro coverings:** they go on with thin double-sided tape. They cut around the barrel and the screw heads, so the camera can still be opened.
+**Retro coverings:** they go on with thin double-sided tape. The front one sits inside the rim, flush with it. Both are cut around the screw heads (and the front one around the barrel), so the camera can still be opened.
 
 ### Hardware
 

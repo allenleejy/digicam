@@ -32,16 +32,16 @@ def overlap(job):
         if "top level object is empty" in log:
             return style, a, b, None
         if not os.path.exists(out):
-            return style, a, b, "error: " + log.strip().splitlines()[-1]
-        # bounding box of the overlap, so it's clear where it is
-        xs, ys, zs = [], [], []
-        for line in open(out):
-            p = line.split()
-            if p and p[0] == "vertex":
-                xs.append(float(p[1])); ys.append(float(p[2])); zs.append(float(p[3]))
-        if min(max(v) - min(v) for v in (xs, ys, zs)) < 0.05:
+            return style, a, b, f"error (exit {r.returncode}): " + (log.strip().splitlines() or ["no output"])[-1]
+        # bounding box of the overlap, so it's clear where it is, and its volume
+        pts = [tuple(map(float, l.split()[1:4])) for l in open(out) if l.split()[:1] == ["vertex"]]
+        xs, ys, zs = zip(*pts)
+        vol = abs(sum(  # signed tetrahedra from the origin
+            (p[0] * (q[1] * r[2] - q[2] * r[1]) - p[1] * (q[0] * r[2] - q[2] * r[0]) + p[2] * (q[0] * r[1] - q[1] * r[0])) / 6
+            for p, q, r in zip(pts[0::3], pts[1::3], pts[2::3])))
+        if vol < 0.01 or min(max(v) - min(v) for v in (xs, ys, zs)) < 0.05:
             return style, a, b, None   # touching faces (a part resting on its seat), not an overlap
-        return style, a, b, f"x {min(xs):.1f}..{max(xs):.1f}  y {min(ys):.1f}..{max(ys):.1f}  z {min(zs):.1f}..{max(zs):.1f}"
+        return style, a, b, f"{vol:.2f} mm3 at x {min(xs):.1f}..{max(xs):.1f}  y {min(ys):.1f}..{max(ys):.1f}  z {min(zs):.1f}..{max(zs):.1f}"
 
 
 with ThreadPoolExecutor(8) as ex:
